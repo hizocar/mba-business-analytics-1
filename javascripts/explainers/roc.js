@@ -1,11 +1,12 @@
-/* Class 12b: the ROC curve is what you get by sliding the threshold across
-   two score distributions; AUC measures how far apart those distributions are. */
+/* Week 4: the ROC curve is what you get by sliding the threshold across the
+   scores of bookings that cancel and bookings that arrive; AUC measures how far
+   apart those two groups are. Altamar's logistic model scores AUC 0.74. */
 (function () {
   const { el, svg, slider, button, stats, scale, tween, fmt, clamp, lerp } = HZ;
 
   const W = 520, H = 300, M = { l: 20, r: 16, t: 34, b: 40 };
   const RW = 300, RH = 300, RM = { l: 52, r: 12, t: 12, b: 40 };
-  const NPOS = 300, NNEG = 700;
+  const NPOS = 340, NNEG = 660; // about a third of bookings cancel
   const GRID = 241;
   let uid = 0;
 
@@ -40,7 +41,7 @@
 
   function mount(body) {
     const id = "hz-roc-" + ++uid;
-    let t = 0.5, sep = 1.6;
+    let t = 0.5, sep = 0.91; // separation 0.91 gives AUC 0.74, like the notebook's model
     let sweeping = false, anim = 0;
 
     const xs = scale([0, 1], [M.l, W - M.r]);
@@ -55,7 +56,7 @@
       ]);
 
     // Score distributions
-    const plot = svg("svg", { viewBox: `0 0 ${W} ${H}`, class: "hz-roc-plot", role: "img", "aria-label": "Score distributions of buyers and non-buyers with a movable threshold" });
+    const plot = svg("svg", { viewBox: `0 0 ${W} ${H}`, class: "hz-roc-plot", role: "img", "aria-label": "Score distributions of cancelled and arrived bookings with a movable threshold" });
     plot.append(svg("defs", {}, [hatch("is-neg", "fp"), hatch("is-pos", "fn")]));
     [0, 0.25, 0.5, 0.75, 1].forEach((v) => {
       plot.append(svg("line", { class: "hz-gridline", x1: xs(v), x2: xs(v), y1: M.t, y2: H - M.b }));
@@ -63,7 +64,7 @@
     });
     plot.append(
       svg("line", { class: "hz-axis", x1: M.l, x2: W - M.r, y1: H - M.b, y2: H - M.b }),
-      svg("text", { x: (M.l + W - M.r) / 2, y: H - 6, "text-anchor": "middle", text: "model score: P(buys)" })
+      svg("text", { x: (M.l + W - M.r) / 2, y: H - 6, "text-anchor": "middle", text: "model score: P(cancels)" })
     );
     const area = {};
     ["tn", "fp", "fn", "tp"].forEach((k) => (area[k] = svg("path", { class: "hz-roc-area is-" + k })));
@@ -71,18 +72,18 @@
     area.fn.setAttribute("fill", `url(#${id}-fn)`);
     const negLine = svg("path", { class: "hz-stroke-b", "stroke-width": 2 });
     const posLine = svg("path", { class: "hz-stroke-a", "stroke-width": 2 });
-    const negLabel = svg("text", { class: "hz-roc-clabel is-neg", "text-anchor": "middle", text: "did not buy (700)" });
-    const posLabel = svg("text", { class: "hz-roc-clabel is-pos", "text-anchor": "middle", text: "bought (300)" });
+    const negLabel = svg("text", { class: "hz-roc-clabel is-neg", "text-anchor": "middle", text: "arrived (660)" });
+    const posLabel = svg("text", { class: "hz-roc-clabel is-pos", "text-anchor": "middle", text: "cancelled (340)" });
     const tLine = svg("line", { y1: M.t - 4, y2: H - M.b, class: "hz-roc-tline" });
     const hit = svg("rect", { y: M.t - 22, width: 28, height: H - M.b - M.t + 22, class: "hz-roc-hit" });
     const knob = svg("circle", { cy: M.t - 10, r: 8, class: "hz-roc-knob", tabindex: 0, role: "slider", "aria-label": "Threshold", "aria-valuemin": 0.01, "aria-valuemax": 0.99 });
     const tLabel = svg("text", { y: M.t - 6, class: "hz-roc-tlabel" });
-    const leftLab = svg("text", { y: M.t + 12, "text-anchor": "end", class: "hz-roc-side", text: "← predict: no" });
-    const rightLab = svg("text", { y: M.t + 12, class: "hz-roc-side", text: "predict: buys →" });
+    const leftLab = svg("text", { y: M.t + 12, "text-anchor": "end", class: "hz-roc-side", text: "← not flagged" });
+    const rightLab = svg("text", { y: M.t + 12, class: "hz-roc-side", text: "flagged →" });
     plot.append(area.tn, area.fp, area.fn, area.tp, negLine, posLine, negLabel, posLabel, leftLab, rightLab, tLine, hit, knob, tLabel);
 
     // ROC curve
-    const roc = svg("svg", { viewBox: `0 0 ${RW} ${RH}`, role: "img", "aria-label": "ROC curve with the current threshold marked" });
+    const roc = svg("svg", { viewBox: `0 0 ${RW} ${RH}`, class: "hz-roc-roc", role: "img", "aria-label": "ROC curve with the current threshold marked" });
     [0, 0.25, 0.5, 0.75, 1].forEach((v) => {
       roc.append(
         svg("line", { class: "hz-gridline", x1: rx(v), x2: rx(v), y1: ry(0), y2: ry(1) }),
@@ -192,10 +193,10 @@
 
       note.innerHTML =
         sep < 0.35
-          ? "The two groups get the same scores, so every threshold catches buyers and non-buyers at the same rate: the ROC curve is the diagonal and <strong>AUC ≈ 0.5</strong>, a coin flip."
+          ? "The two groups get the same scores, so every threshold flags cancellations and arriving guests at the same rate: the ROC curve is the diagonal and <strong>AUC ≈ 0.5</strong>, a coin flip."
           : auc > 0.95
-            ? "Scores barely overlap, so some threshold catches almost every buyer while flagging almost no one else: the curve hugs the top-left corner and <strong>AUC → 1</strong>."
-            : "Each threshold is one point on the ROC curve. Moving it left catches more buyers (TPR ↑) but also flags more non-buyers (FPR ↑). The <strong>AUC</strong> depends only on how much the two curves overlap, not on the threshold.";
+            ? "Scores barely overlap, so some threshold catches almost every cancellation while flagging almost no guest who arrives: the curve hugs the top-left corner and <strong>AUC → 1</strong>."
+            : (Math.abs(auc - 0.74) < 0.006 ? "This is about how well Altamar\u2019s model separates the two groups: <strong>AUC 0.74</strong>. " : "") + "Each threshold is one point on the ROC curve. Moving it left catches more cancellations (TPR ↑) but also flags more guests who arrive (FPR ↑). The <strong>AUC</strong> depends only on how much the two curves overlap, not on the threshold.";
     }
 
     function setT(v) {
@@ -228,6 +229,7 @@
       if (me === anim) cancel(), draw();
     }
     const sweepBtn = button("Sweep threshold 1 → 0", sweep, "primary");
+    const altamarBtn = button("Altamar\u2019s model (AUC 0.74)", () => { cancel(); sep = 0.91; sSep.set(sep); draw(); });
 
     // Dragging the threshold: the knob or the band around the line (and, with
     // a mouse, anywhere on the plot).
@@ -256,13 +258,13 @@
     });
 
     body.append(
-      el("p", { class: "hz-x__lede", html: "A model gives every customer a score. Buyers (orange) should score high, non-buyers (teal) low, but the two groups overlap. The <strong>threshold</strong> splits each group in two; the <strong>ROC curve</strong> records the result for every possible threshold." }),
+      el("p", { class: "hz-x__lede", html: "The model gives every booking a probability of cancelling. Cancelled bookings (orange) should score high, arrivals (teal) low, but the two groups overlap. The <strong>threshold</strong> splits each group in two; the <strong>ROC curve</strong> records the result for every possible threshold." }),
       el("div", { class: "hz-x__split" }, [
         el("div", {}, [plot, counts]),
         el("div", {}, [roc]),
       ]),
       el("div", { class: "hz-roc-bottom" }, [
-        el("div", { class: "hz-roc-controls" }, [sT.node, sSep.node, el("div", { class: "hz-x__controls" }, [sweepBtn])]),
+        el("div", { class: "hz-roc-controls" }, [sT.node, sSep.node, el("div", { class: "hz-x__controls" }, [sweepBtn, altamarBtn])]),
         readout.node,
       ]),
       note
@@ -271,5 +273,15 @@
     draw();
   }
 
-  HZ.register("roc", { kicker: "Session 5", title: "ROC curve and AUC, built by a threshold", mount });
+  HZ.register("roc", {
+    kicker: "Week 4",
+    title: "ROC curve and AUC, built by a threshold",
+    mount,
+    css: `
+.md-typeset .hz-x svg.hz-roc-plot text { font-size: 14px; }
+.md-typeset .hz-x svg.hz-roc-plot text.hz-roc-clabel { font-size: 14px; }
+.md-typeset .hz-x svg.hz-roc-plot text.hz-roc-side { font-size: 13px; }
+.md-typeset .hz-x svg.hz-roc-roc text { font-size: 13px; }
+`,
+  });
 })();

@@ -1,36 +1,36 @@
 /*
- * train-test-split: Session 3. Customers are shuffled, the first 70% go into
- * a training bin and the last 30% into a test bin that gets sealed. A toggle
- * shows the mistake of grading the model on the rows it learned from.
+ * train-test-split: Week 3. Altamar bookings are shuffled, the first 75% go
+ * into a training bin and the last 25% into a test bin that gets sealed. A
+ * toggle shows the mistake of grading the model on the rows it learned from.
  */
 (function () {
   const { el, svg } = HZ;
 
-  const N = 20, N_TRAIN = 14; // 70 / 30
+  const N = 16, N_TRAIN = 12; // 75 / 25, as test_size=0.25
   const CW = 38, CH = 26;
 
   // Two layouts: wide (desktop) and narrow (phones), so the text stays legible.
   function layout(narrow) {
     if (!narrow) {
-      const gx0 = (520 - (10 * CW + 9 * 8)) / 2;
+      const gx0 = (520 - (8 * CW + 7 * 8)) / 2;
       return {
         W: 520, H: 266, narrow,
         top: { y: 18 },
-        grid: (s) => ({ x: gx0 + (s % 10) * (CW + 8), y: 30 + Math.floor(s / 10) * (CH + 9) }),
+        grid: (s) => ({ x: gx0 + (s % 8) * (CW + 8), y: 30 + Math.floor(s / 8) * (CH + 9) }),
         train: { x: 8, y: 122, w: 334, h: 120 },
         test: { x: 356, y: 122, w: 156, h: 120 },
-        tPos: (k) => ({ x: 8 + 16 + (k % 7) * (CW + 6), y: 122 + 46 + Math.floor(k / 7) * (CH + 8) }),
-        sPos: (k) => ({ x: 356 + 15 + (k % 3) * (CW + 6), y: 122 + 46 + Math.floor(k / 3) * (CH + 8) }),
+        tPos: (k) => ({ x: 8 + 16 + (k % 6) * (CW + 6), y: 122 + 46 + Math.floor(k / 6) * (CH + 8) }),
+        sPos: (k) => ({ x: 356 + 15 + (k % 2) * (CW + 6), y: 122 + 46 + Math.floor(k / 2) * (CH + 8) }),
       };
     }
-    const gx0 = (340 - (5 * CW + 4 * 10)) / 2;
+    const gx0 = (340 - (4 * CW + 3 * 10)) / 2;
     return {
       W: 340, H: 424, narrow,
       top: { y: 18 },
-      grid: (s) => ({ x: gx0 + (s % 5) * (CW + 10), y: 30 + Math.floor(s / 5) * (CH + 8) }),
+      grid: (s) => ({ x: gx0 + (s % 4) * (CW + 10), y: 30 + Math.floor(s / 4) * (CH + 8) }),
       train: { x: 4, y: 176, w: 332, h: 112 },
       test: { x: 4, y: 314, w: 332, h: 84 },
-      tPos: (k) => ({ x: 4 + 15 + (k % 7) * (CW + 6), y: 176 + 44 + Math.floor(k / 7) * (CH + 8) }),
+      tPos: (k) => ({ x: 4 + 15 + (k % 6) * (CW + 6), y: 176 + 44 + Math.floor(k / 6) * (CH + 8) }),
       sPos: (k) => ({ x: 4 + 15 + k * (CW + 6), y: 314 + 44 }),
     };
   }
@@ -43,7 +43,7 @@
       const j = Math.floor(r() * (i + 1));
       [p[i], p[j]] = [p[j], p[i]];
     }
-    return p; // p[slot] = customer id
+    return p; // p[slot] = booking id
   }
 
   const css = `
@@ -80,7 +80,7 @@
 `;
 
   HZ.register("train-test-split", {
-    kicker: "Session 3",
+    kicker: "Week 3",
     title: "Train and test: a sealed envelope",
     css,
     mount(body) {
@@ -89,9 +89,9 @@
       let L = layout(false);
 
       body.append(el("p", { class: "hz-x__lede", html:
-        "Each chip is one customer. <code>train_test_split</code> shuffles them, deals the first 70% into a <strong>training set</strong> the model learns from, and seals the other 30% in a <strong>test set</strong> that we open only once, at the end." }));
+        "Each chip is one Altamar booking, with its rate. <code>train_test_split</code> shuffles them, deals the first 75% into a <strong>training set</strong> the model learns from, and seals the other 25% in a <strong>test set</strong> that we open only once, at the end." }));
 
-      const names = ["Shuffle", "Split 70 / 30", "Deal into sets", "Seal the test set"];
+      const names = ["Shuffle", "Split 75 / 25", "Deal into sets", "Seal the test set"];
       const pills = names.map((n, i) => el("span", { class: "hz-tts-pill" }, [el("b", { text: i + 1 }), n]));
       const playBtn = HZ.button("Play", () => play(), "primary");
       const stepBtn = HZ.button("Step", () => step());
@@ -106,7 +106,7 @@
         el("div", { class: "hz-x__controls" }, [playBtn, stepBtn, resetBtn])
       );
 
-      const fig = svg("svg", { class: "hz-tts-fig", role: "img", "aria-label": "Twenty customers shuffled and split into a training set and a sealed test set" });
+      const fig = svg("svg", { class: "hz-tts-fig", role: "img", "aria-label": "Sixteen bookings shuffled and split into a training set and a sealed test set" });
       const note = el("p", { class: "hz-x__note", "aria-live": "polite" });
       body.append(
         fig,
@@ -119,7 +119,7 @@
       function build() {
         fig.replaceChildren();
         fig.setAttribute("viewBox", `0 0 ${L.W} ${L.H}`);
-        topLab = svg("text", { x: L.W / 2, y: L.top.y, "text-anchor": "middle", class: "hz-tts-binsub", text: "all 20 customers, in file order" });
+        topLab = svg("text", { x: L.W / 2, y: L.top.y, "text-anchor": "middle", class: "hz-tts-binsub", text: "all 16 bookings, in file order" });
         fig.append(topLab);
 
         const bin = (b, cls, title, sub) => {
@@ -131,14 +131,14 @@
           fig.append(g);
           return r;
         };
-        trainBin = bin(L.train, "is-train", "Training set · 70%", "the model learns from these");
-        testBin = bin(L.test, "is-test", "Test set · 30%", L.narrow ? "kept aside to grade the model" : "kept aside to grade");
+        trainBin = bin(L.train, "is-train", "Training set · 75%", "the model learns from these");
+        testBin = bin(L.test, "is-test", "Test set · 25%", L.narrow ? "kept aside to grade the model" : "kept aside");
         const under = (b) => ({ x: b.x + b.w / 2, y: b.y + b.h + 17, "text-anchor": "middle", opacity: 0 });
         trainGrade = svg("text", { ...under(L.train), class: "hz-tts-grade is-bad", text: "graded here: flattering" });
         testGrade = svg("text", { ...under(L.test), class: "hz-tts-grade is-good", text: "graded here: honest" });
         fig.append(trainGrade, testGrade);
 
-        // Empty outlines of the original table, shown once the customers have left it
+        // Empty outlines of the original table, shown once the bookings have left it
         ghosts = svg("g", { class: "hz-tts-ghosts", opacity: 0 });
         for (let i = 0; i < N; i++) {
           const p = L.grid(i);
@@ -171,7 +171,7 @@
         fig.append(seal);
       }
 
-      // Where each customer sits at a given stage
+      // Where each booking sits at a given stage
       function target(id, s) {
         const slot = s >= 1 ? perm.indexOf(id) : id;
         if (s < 3) return L.grid(slot);
@@ -191,7 +191,7 @@
           place(i, target(i, stage));
           colour(i, stage >= 2);
         }
-        topLab.textContent = stage === 0 ? "all 20 customers, in file order" : stage < 3 ? "shuffled with random_state=" + seed : (L.narrow ? "the table, now split in two" : "every customer has left the table for one of the two sets");
+        topLab.textContent = stage === 0 ? "all 16 bookings, in file order" : stage < 3 ? "shuffled with random_state=" + seed : (L.narrow ? "the table, now split in two" : "every booking has left the table for one of the two sets");
         ghosts.setAttribute("opacity", stage >= 3 ? 1 : 0);
         seal.setAttribute("opacity", stage >= 4 ? 1 : 0);
         paintGrade();
@@ -308,13 +308,13 @@
       function caption() {
         const c = (s) => "<code>" + s + "</code>";
         if (stage >= 4 && grade === "train")
-          return "<strong>The mistake:</strong> grading on the training customers is an exam where the student already saw the answers. The model has seen these exact bills, so the score flatters it. A model that simply memorized them would look perfect here and still fail on the next customer who walks in.";
+          return "<strong>The mistake:</strong> grading on the training bookings is an exam where the student already saw the answers. The model has seen these exact rates, so the score flatters it. A model that simply memorized them would look perfect here and still misprice the next booking that comes in.";
         if (stage >= 4)
-          return "<strong>Sealed.</strong> We fit and compare models using only the training set. The test set is opened once, at the end, to answer the only question the commercial team cares about: how far off are we on customers the model has never seen?";
-        if (stage === 3) return "Every customer lands in exactly one set: 14 for training, 6 for testing. On the real table that is 3,489 and 1,496 customers.";
-        if (stage === 2) return "The first 70% of the shuffled order go to training (teal), the last 30% to testing (orange). " + c("test_size=0.3") + " sets that share.";
-        if (stage === 1) return "Shuffled first, because files are often sorted (by signup date, by region). Without shuffling, the test set could be only the newest customers. " + c("random_state=" + seed) + " makes the shuffle repeatable" + (seed !== 42 ? ": a different seed gives a different, equally valid split." : ".");
-        return "The customer table in the order it came from the file. Press <strong>Play</strong> to split it the way " + c("train_test_split(X, y, test_size=0.3, random_state=42)") + " does.";
+          return "<strong>Sealed.</strong> We fit and compare models using only the training set. The test set is opened once, at the end, to answer the only question revenue management cares about: how far off is the rate on bookings the model has never seen?";
+        if (stage === 3) return "Every booking lands in exactly one set: 12 for training, 4 for testing. With Altamar's 5,964 clean bookings that is 4,473 to learn from and 1,491 sealed.";
+        if (stage === 2) return "The first 75% of the shuffled order go to training (teal), the last 25% to testing (orange). " + c("test_size=0.25") + " sets that share.";
+        if (stage === 1) return "Shuffled first, because files are often sorted (by date, by hotel). Without shuffling, the test set could be only December arrivals, or only Puerto Varas. " + c("random_state=" + seed) + " makes the shuffle repeatable" + (seed !== 42 ? ": a different seed gives a different, equally valid split." : ".");
+        return "The bookings in the order they came from the file. Press <strong>Play</strong> to split them the way " + c("train_test_split(df, test_size=0.25, random_state=42)") + " does.";
       }
 
       function syncUi() {

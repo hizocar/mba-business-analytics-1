@@ -1,69 +1,67 @@
 /*
- * function-machine (Session 1): estimate_bill as a machine. Arguments drop in
- * at the top and bind to the parameters (a missing roaming takes its default),
+ * function-machine (Week 1): stay_revenue as a machine. Arguments drop in at
+ * the top and bind to the parameters (a missing discount takes its default),
  * the body runs line by line with its local variables, and only the return
- * value comes out of the bottom into `estimate`.
+ * value comes out of the bottom into `revenue`.
  */
 (function () {
   const { el } = HZ;
   const P = "hz-function-machine-";
   const cls = (s) => P + s.split(" ").join(" " + P);
 
-  const BASE = { Prepaid: 9, Basic: 18, Plus: 29, Unlimited: 42 };
-  const PLANS = Object.keys(BASE);
   const CODE = [
-    "def estimate_bill(plan, data_gb, roaming=False):",
-    '    base = {"Prepaid": 9, "Basic": 18, "Plus": 29, "Unlimited": 42}[plan]',
-    '    per_gb = 0.10 if plan == "Unlimited" else 0.55',
-    "    bill = base + per_gb * data_gb",
-    "    if roaming:",
-    "        bill = bill + 8",
-    "    return round(bill, 2)",
+    "def stay_revenue(adr, nights, discount=0):",
+    "    total = adr * nights",
+    "    if discount > 0:",
+    "        total = total * (1 - discount)",
+    "    return round(total, 2)",
+  ];
+  const DISCOUNTS = [
+    { value: "0", label: "not passed" },
+    { value: "0.1", label: "0.10" },
+    { value: "0.15", label: "0.15" },
+    { value: "0.25", label: "0.25" },
   ];
 
-  // Python reprs
+  // Python-like reprs. adr is always shown as a float (180.0), nights as an int.
   const pyFloat = (x) => (Number.isInteger(x) ? x.toFixed(1) : String(x));
-  const pyNum = (x) => String(x); // an int argument stays an int (data_gb=30)
-  const numType = (x) => (Number.isInteger(x) ? "int" : "float");
+  const tidy = (x) => pyFloat(Number(x.toFixed(6))); // hide float noise such as 487.35000000000002 in the locals
+  const usd = (x) => "USD " + x.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   // Python's round(x, 2): correctly rounded on the exact binary value, ties to even.
-  // toFixed is exact but sends ties up, so exact ties (13.125) are handled here.
   function round2(x) {
     const t = x.toFixed(3);
     if (t.endsWith("5") && x.toFixed(20) === t + "0".repeat(17)) {
-      const cut = t.slice(0, -1); // "13.12"
+      const cut = t.slice(0, -1);
       const last = +cut[cut.length - 1];
       if (last % 2 === 0) return Number(cut);
     }
     return Number(x.toFixed(2));
   }
 
-  function compute(plan, gb, roaming) {
-    const base = BASE[plan];
-    const perGb = plan === "Unlimited" ? 0.1 : 0.55;
-    const bill1 = base + perGb * gb;
-    const bill2 = roaming ? bill1 + 8 : bill1;
-    return { base, perGb, bill1, bill2, ret: round2(bill2) };
+  function compute(adr, nights, discount) {
+    const t1 = adr * nights;
+    const t2 = discount > 0 ? t1 * (1 - discount) : t1;
+    return { t1, t2, ret: round2(t2) };
   }
 
   const badge = (type) => el("span", { class: cls("badge") + " is-" + type, text: type });
 
   function mount(body) {
     body.classList.add(P + "root");
-    let plan = "Plus";
-    let gb = 5.2;
-    let roaming = false;
+    let adr = 180.5;
+    let nights = 3;
+    let discount = 0;
     let runId = 0;
     let timer = null;
     const log = [];
 
-    const callExpr = () => 'estimate_bill("' + plan + '", ' + pyNum(gb) + (roaming ? ", roaming=True" : "") + ")";
+    const callExpr = () => "stay_revenue(" + pyFloat(adr) + ", " + nights + (discount > 0 ? ", discount=" + discount.toFixed(2) : "") + ")";
 
     // ---- Controls
-    const seg = HZ.segmented(PLANS.map((p) => ({ value: p, label: p })), plan, (v) => { plan = v; schedule(0); });
-    const sl = HZ.slider({ label: "data_gb", min: 0, max: 40, step: 0.1, value: gb, format: (v) => String(+v.toFixed(1)), oninput: (v) => { gb = v; schedule(260); } });
-    const cbId = "hz-fm-" + Math.random().toString(36).slice(2, 8);
-    const cb = el("input", { type: "checkbox", id: cbId, onchange: () => { roaming = cb.checked; schedule(0); } });
-    const cbLabel = el("label", { for: cbId, class: cls("toggle") }, [cb, el("span", { html: "pass <code>roaming=True</code>" })]);
+    const sAdr = HZ.slider({ label: "adr (USD a night)", min: 60, max: 400, step: 0.5, value: adr, format: (v) => pyFloat(v), oninput: (v) => { adr = v; schedule(280); } });
+    const sNights = HZ.slider({ label: "nights", min: 1, max: 14, step: 1, value: nights, oninput: (v) => { nights = v; schedule(280); } });
+    const seg = HZ.segmented(DISCOUNTS, "0", (v) => { discount = +v; schedule(0); });
+    const segWrap = el("div", { class: cls("field") }, [el("span", { class: cls("flabel"), text: "discount" }), seg.node]);
     const again = HZ.button("Call it again", () => run(true), "primary");
 
     // ---- Call line
@@ -76,19 +74,19 @@
     // ---- Machine body
     const lines = CODE.map((t, i) => el("span", { class: cls("line") + (i === 0 ? " " + P + "def" : "") }, [el("span", { text: t })]));
     const ifChip = el("span", { class: cls("cond") });
-    lines[4].append(ifChip);
+    lines[2].append(ifChip);
     const code = el("pre", { class: cls("code") }, lines);
     const locals = el("div", { class: cls("locals") });
     const localTitle = el("p", { class: cls("ltitle"), text: "Inside the function" });
     const machine = el("div", { class: cls("stage") + " " + P + "machine" }, [
-      el("p", { class: cls("stitle") }, ["2 · The body runs inside the machine ", el("span", { class: cls("plate"), text: "estimate_bill" })]),
+      el("p", { class: cls("stitle") }, ["2 · The body runs inside the machine ", el("span", { class: cls("plate"), text: "stay_revenue" })]),
       el("div", { class: cls("mgrid") }, [
         code,
         el("div", { class: cls("localbox") }, [localTitle, locals]),
       ]),
     ]);
 
-    // ---- Chute (return value → estimate)
+    // ---- Chute (return value → revenue)
     const retChip = el("span", { class: cls("ret") });
     const landed = el("span", { class: cls("landed") });
     const chute = el("div", { class: cls("stage") + " " + P + "chute" }, [
@@ -100,8 +98,8 @@
     const note = el("p", { class: "hz-x__note", "aria-live": "polite" });
 
     body.append(
-      el("p", { class: "hz-x__lede", html: "You write <code>estimate_bill</code> once and call it for any customer. Change the inputs: the arguments drop in, the body runs top to bottom, and one value comes out." }),
-      el("div", { class: "hz-x__controls" }, [seg.node, sl.node, cbLabel]),
+      el("p", { class: "hz-x__lede", html: "Revenue management writes <code>stay_revenue</code> once and calls it for any booking. Change the inputs: the arguments drop in, the body runs top to bottom, and one number comes out." }),
+      el("div", { class: "hz-x__controls " + P + "ctrls" }, [sAdr.node, sNights.node, segWrap]),
       call,
       hopper,
       el("div", { class: cls("down"), "aria-hidden": "true", text: "↓" }),
@@ -117,7 +115,7 @@
 
     function schedule(ms) {
       clearTimeout(timer);
-      call.replaceChildren(el("span", { class: cls("prompt"), text: ">>> " }), "estimate = " + callExpr());
+      call.replaceChildren(el("span", { class: cls("prompt"), text: ">>> " }), "revenue = " + callExpr());
       timer = setTimeout(() => body.isConnected && run(true), ms);
     }
 
@@ -158,11 +156,11 @@
 
     function captionFinal(r) {
       const parts = [];
-      parts.push(roaming
-        ? "You passed roaming=True, which overrides the default, so the 8 USD roaming fee is added."
-        : "You did not pass roaming, so Python used its default, False, and skipped the fee.");
-      if (plan === "Unlimited") parts.push(" Unlimited pays only 0.10 per GB instead of 0.55, so data barely moves the bill.");
-      parts.push(" base, per_gb and bill vanished after return: only " + pyFloat(r.ret) + " came out, into estimate.");
+      parts.push(nights + (nights === 1 ? " night" : " nights") + " at " + usd(adr) + " bring " + usd(r.ret) + ". ");
+      parts.push(discount > 0
+        ? "You passed discount=" + discount.toFixed(2) + ", which overrides the default, so the guest pays " + Math.round((1 - discount) * 100) + "% of the full price: " + usd(r.t1 - r.ret) + " less."
+        : "You did not pass a discount, so Python used its default, 0, and skipped the discount line.");
+      parts.push(" total vanished after return: only " + pyFloat(r.ret) + " came out, into revenue.");
       return parts.join("");
     }
 
@@ -172,10 +170,9 @@
       const alive = () => id === runId && body.isConnected;
       const instant = !animate || HZ.reducedMotion();
       const pause = (ms) => (instant ? Promise.resolve() : HZ.wait(ms));
-      const r = compute(plan, gb, roaming);
+      const r = compute(adr, nights, discount);
 
-      call.replaceChildren(el("span", { class: cls("prompt"), text: ">>> " }), "estimate = " + callExpr());
-      // clear the machine
+      call.replaceChildren(el("span", { class: cls("prompt"), text: ">>> " }), "revenue = " + callExpr());
       params.replaceChildren();
       locals.replaceChildren();
       for (const k of Object.keys(localRows)) delete localRows[k];
@@ -185,7 +182,7 @@
       retChip.textContent = "";
       retChip.className = cls("ret");
       landed.className = cls("landed");
-      landed.textContent = "estimate = …";
+      landed.textContent = "revenue = …";
       machine.classList.add("is-running");
       localTitle.textContent = "Inside the function (local variables)";
       const on = (i, text) => {
@@ -197,9 +194,9 @@
       // 1. bind arguments to parameters
       on(0, "Python matches each argument to a parameter, in order. Anything you don't pass takes its default.");
       const cards = [
-        paramCard("plan", "'" + plan + "'", "str"),
-        paramCard("data_gb", pyNum(gb), numType(gb)),
-        roaming ? paramCard("roaming", "True", "bool", { text: "passed" }) : paramCard("roaming", "False", "bool", { text: "← default", def: true }),
+        paramCard("adr", pyFloat(adr), "float"),
+        paramCard("nights", String(nights), "int"),
+        discount > 0 ? paramCard("discount", discount.toFixed(2), "float", { text: "passed" }) : paramCard("discount", "0", "int", { text: "← default", def: true }),
       ];
       for (const c of cards) {
         if (!instant) c.classList.add(P + "drop");
@@ -211,30 +208,22 @@
       if (!alive()) return;
 
       // 2. run the body
-      on(1, "Look up the plan's base price in a dictionary.");
-      setLocal("base", String(r.base), "int");
-      await pause(380);
+      on(1, "Full price first: the nightly rate times the number of nights.");
+      setLocal("total", tidy(r.t1), "float", pyFloat(adr) + " * " + nights);
+      await pause(420);
       if (!alive()) return;
-      on(2, plan === "Unlimited" ? "Unlimited, so data costs 0.10 per GB." : "Not Unlimited, so data costs 0.55 per GB.");
-      setLocal("per_gb", pyFloat(r.perGb), "float");
-      await pause(380);
+      on(2, discount > 0 ? "discount is " + discount.toFixed(2) + ", more than 0, so the indented line runs." : "discount is 0 (the default), so the indented line is skipped.");
+      ifChip.textContent = discount > 0 ? "→ True" : "→ False";
+      ifChip.className = cls("cond") + (discount > 0 ? " is-true" : " is-false");
+      await pause(420);
       if (!alive()) return;
-      on(3, "Base price plus the data charge.");
-      setLocal("bill", pyFloat(r.bill1), "float", r.base + " + " + pyFloat(r.perGb) + " * " + pyNum(gb));
-      await pause(380);
-      if (!alive()) return;
-      on(4, roaming ? "roaming is True, so the indented line runs." : "roaming is False (the default), so the indented line is skipped.");
-      ifChip.textContent = roaming ? "→ True" : "→ False";
-      ifChip.className = cls("cond") + (roaming ? " is-true" : " is-false");
-      await pause(380);
-      if (!alive()) return;
-      if (roaming) {
-        on(5, "Add the 8 USD roaming fee.");
-        setLocal("bill", pyFloat(r.bill2), "float", pyFloat(r.bill1) + " + 8");
-        await pause(380);
+      if (discount > 0) {
+        on(3, "Take the discount off: keep " + Math.round((1 - discount) * 100) + "% of the full price.");
+        setLocal("total", tidy(r.t2), "float", tidy(r.t1) + " * (1 - " + discount.toFixed(2) + ")");
+        await pause(420);
         if (!alive()) return;
-      } else lines[5].classList.add("is-skip");
-      on(6, "return sends the rounded bill out of the machine.");
+      } else lines[3].classList.add("is-skip");
+      on(4, "return sends the total, rounded to cents, out of the machine.");
       await pause(320);
       if (!alive()) return;
 
@@ -246,7 +235,7 @@
       if (!instant) retChip.classList.add(P + "slide");
       await pause(420);
       if (!alive()) return;
-      landed.textContent = "estimate = " + pyFloat(r.ret);
+      landed.textContent = "revenue = " + pyFloat(r.ret);
       landed.classList.add("is-on");
       if (!instant) flash(landed);
       lines.forEach((l) => l.classList.remove("is-on"));
@@ -262,10 +251,13 @@
   }
 
   HZ.register("function-machine", {
-    kicker: "Session 1",
+    kicker: "Week 1",
     title: "A function is a machine",
     mount,
     css: `
+.md-typeset .hz-function-machine-ctrls { align-items: flex-end; }
+.md-typeset .hz-function-machine-field { display: flex; flex-direction: column; gap: 0.3rem; }
+.md-typeset .hz-function-machine-flabel { font-size: 0.68rem; color: var(--md-default-fg-color--light); }
 .md-typeset .hz-function-machine-call, .md-typeset .hz-function-machine-code {
   margin: 0; border-radius: 8px; font-family: var(--md-code-font); font-size: 0.68rem; line-height: 1.6;
   background: var(--md-default-bg-color); border: 1px solid var(--hz-line); color: var(--md-default-fg-color); overflow-x: auto;

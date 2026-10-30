@@ -1,28 +1,28 @@
-/* Session 5: the pyramid principle. Cordillera's 10-minute presentation is
+/* Week 6: the pyramid principle. Altamar's 10-minute presentation is
    built top-down (key message, three arguments, evidence), then the same
    boxes are rearranged into report order to show how late the answer
    arrives when you tell the story the way you did the analysis.
-   Numbers come from the Session 5 notebook. */
+   Numbers come from the Week 6 notebook. */
 (function () {
   const { el, svg, button, segmented, stats, wait, reducedMotion } = HZ;
 
   const KEY = {
     id: "key", kind: "key", min: 1,
-    text: "Call the 10% of customers the forest flags each month: same number of calls, 3.2× more future churners reached.",
+    text: "Price with gradient boosting and feed its cancellation risks into our overbooking rule: the typical pricing error falls from USD 20 to USD 8 a night, about USD 88,000 a year.",
   };
   const ARGS = [
-    { id: "a1", kind: "arg", min: 0.5, n: 1, text: "Who will leave is predictable" },
-    { id: "a2", kind: "arg", min: 0.5, n: 2, text: "Three groups carry most of the risk" },
-    { id: "a3", kind: "arg", min: 0.5, n: 3, text: "A targeted call list pays off" },
+    { id: "a1", kind: "arg", min: 0.5, n: 1, text: "The model prices like our best revenue manager" },
+    { id: "a2", kind: "arg", min: 0.5, n: 2, text: "We know what drives price and cancellations" },
+    { id: "a3", kind: "arg", min: 0.5, n: 3, text: "It pays off in two daily decisions" },
   ];
   const EVIDENCE = [
-    { id: "e1", arg: 0, kind: "ev", type: "chart", min: 1.2, text: "ROC curves: forest AUC 0.74, logistic 0.72, coin toss 0.50" },
-    { id: "e2", arg: 0, kind: "ev", type: "table", min: 1.2, text: "Model table: the forest reaches 32% of churners with 10% of the calls" },
-    { id: "e3", arg: 1, kind: "ev", type: "number", min: 0.8, text: "New customers (< 6 months): 44.4% churn vs 14.5%" },
-    { id: "e4", arg: 1, kind: "ev", type: "number", min: 0.8, text: "3+ support tickets: 49.8% churn vs 14.5%" },
-    { id: "e5", arg: 1, kind: "ev", type: "number", min: 0.8, text: "Norte with 2+ tickets: 51.1% churn vs 14.1%" },
-    { id: "e6", arg: 2, kind: "ev", type: "table", min: 1.2, text: "Call list: 66 churners in 124 calls, vs 20 calling at random" },
-    { id: "e7", arg: 2, kind: "ev", type: "number", min: 1.2, text: "≈ 79 customers kept a month vs 24 (if 3 in 10 are saved)" },
+    { id: "e1", arg: 0, kind: "ev", type: "chart", min: 1.2, text: "Scoreboard on the same test bookings: R² 0.74 line, 0.89 tuned tree, 0.94 forest, 0.96 boosting" },
+    { id: "e2", arg: 0, kind: "ev", type: "number", min: 0.8, text: "Stable: retrained on other samples, forests move their quotes by USD 8, tuned trees by USD 20" },
+    { id: "e3", arg: 1, kind: "ev", type: "chart", min: 1.0, text: "Month, room type and hotel move the price by USD 20 or more each; deposit and country, not at all" },
+    { id: "e4", arg: 1, kind: "ev", type: "chart", min: 1.0, text: "Each hotel has its own seasons: Puerto Varas peaks in January (USD 197) and July (USD 168)" },
+    { id: "e5", arg: 1, kind: "ev", type: "chart", min: 1.0, text: "Cancellation risk peaks near 70% for bookings made two to four months ahead" },
+    { id: "e6", arg: 2, kind: "ev", type: "table", min: 1.2, text: "11% of bookings sold more than 10% below similar ones (travel agents 15%): about USD 18,000 a year" },
+    { id: "e7", arg: 2, kind: "ev", type: "number", min: 1.2, text: "Week 4's overbooking rule (threshold 0.43) costs USD 140,000 with boosting's risks instead of USD 153,100" },
   ];
   const ITEMS = [KEY, ...ARGS, ...EVIDENCE];
 
@@ -43,13 +43,13 @@
   const TIMES = { pyramid: startTimes(PYRAMID_ORDER), report: startTimes(REPORT_ORDER) };
 
   const CAPTIONS = [
-    "The retention director has one question: <em>what should we do about churn?</em> Build the answer top-down. Press \"Next step\".",
-    "<strong>Key message first:</strong> the answer and the action, in one sentence. If the meeting ended now, the director would still know what to do.",
+    "Altamar's general manager has one question: <em>what should we do with these models?</em> Build the answer top-down. Press \"Next step\".",
+    "<strong>Key message first:</strong> the answer and the action, in one sentence. If the meeting ended now, the general manager would still know what to do.",
     "<strong>Three arguments</strong>, each answering \"why should I believe that?\". Three is enough to convince and few enough to remember.",
     "<strong>Evidence under each argument:</strong> one chart or number per box. A chart that supports no argument does not go into the deck.",
   ];
   const REPORT_CAPTION =
-    "The same boxes in <strong>report order</strong>, the order in which you did the analysis: findings, models, list, conclusions… and the recommendation at the very end. If the meeting runs late, the answer is what gets cut.";
+    "The same boxes in <strong>report order</strong>, the order in which you did the analysis: drivers, models, decisions, conclusions… and the recommendation at the very end. If the meeting runs late, the answer is what gets cut.";
 
   function mount(body) {
     let mode = "pyramid";
@@ -218,7 +218,7 @@
     });
 
     body.append(
-      el("p", { class: "hz-x__lede", html: "Cordillera's 10-minute presentation to the retention director. Same content, two orders: build it as a <strong>pyramid</strong> one level at a time, then flip it to the <strong>report</strong> order most first drafts use." }),
+      el("p", { class: "hz-x__lede", html: "Altamar's 10-minute presentation to the general manager. Same content, two orders: build it as a <strong>pyramid</strong> one level at a time, then flip it to the <strong>report</strong> order most first drafts use." }),
       el("div", { class: "hz-x__controls" }, [view.node, nextBtn, allBtn, resetBtn]),
       stage,
       el("div", { class: "hz-pyr-foot" }, [readout.node]),
@@ -245,7 +245,7 @@
   }
 
   HZ.register("pyramid", {
-    kicker: "Session 5",
+    kicker: "Week 6",
     title: "Building the pyramid",
     mount,
     css: `

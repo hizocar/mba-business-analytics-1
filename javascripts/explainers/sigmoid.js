@@ -1,28 +1,26 @@
-/* Session 4: from a line to a probability. Customers who left (1) or stayed
-   (0) plotted against their support tickets. A straight line fitted to 0/1
-   leaves the [0, 1] range; the sigmoid bends the same score w·x + b into an S
-   that never does. Weight and intercept reshape the S; a probe customer reads
-   off p and the predicted class. */
+/* Week 4: from a line to a probability. 90 real Altamar bookings made up to
+   120 days ahead, plotted as cancelled (1) or not (0) against their lead time.
+   A straight line fitted to 0/1 leaves the [0, 1] range; the sigmoid bends
+   the same score w·x + b into an S that never does. Weight and intercept
+   reshape the S; a probe booking reads off p and the predicted class. The
+   axis stops at 120 days on purpose: further out the real risk falls again,
+   which no S-curve can draw (the notebook's section 07, and week 5). */
 (function () {
-  const { el, svg, slider, segmented, stats, button, scale, tween, rng, clamp, lerp } = HZ;
+  const { el, svg, slider, segmented, stats, button, scale, tween, clamp, lerp } = HZ;
 
   const W = 520, H = 320, M = { l: 54, r: 16, t: 16, b: 46 };
-  const X0 = -0.5, X1 = 10.5, Y0 = -0.42, Y1 = 1.42;
+  const X0 = -6, X1 = 206, HIDE = 122, Y0 = -0.42, Y1 = 1.42;
   const sig = (z) => 1 / (1 + Math.exp(-z));
   // never print 0.00 or 1.00 for a sigmoid: it gets close but never touches
   const fp = (v) => (v > 0 && v < 1 && (v < 0.01 || v > 0.99) ? v.toFixed(3) : v.toFixed(2));
 
+  // [lead time in days, cancelled?] for 90 bookings with lead time up to 120 days
+  const DATA = [[2,0],[15,0],[107,1],[13,0],[79,1],[2,0],[15,0],[13,0],[9,1],[5,0],[17,0],[32,0],[45,1],[62,1],[97,0],[37,0],[34,0],[10,0],[57,1],[2,0],[11,0],[0,0],[29,0],[13,0],[56,0],[39,0],[7,1],[13,1],[72,1],[11,0],[10,0],[77,1],[10,0],[4,0],[47,1],[14,0],[50,0],[61,1],[19,0],[46,0],[53,0],[19,1],[11,0],[47,1],[67,1],[70,1],[24,1],[21,0],[30,0],[20,0],[8,0],[39,1],[115,1],[14,1],[106,1],[5,0],[73,0],[2,0],[114,1],[99,1],[51,1],[82,1],[2,0],[4,1],[113,1],[2,1],[114,0],[9,1],[4,1],[36,0],[71,0],[68,1],[103,1],[49,0],[10,0],[78,0],[71,0],[60,0],[11,0],[92,1],[7,0],[37,1],[31,0],[13,0],[1,0],[5,0],[1,0],[68,1],[25,0],[32,0]];
+  // Maximum-likelihood fit of these 90 points (scikit-learn, no penalty)
+  const BEST = { w: 0.0295, b: -1.63 };
+
   function makeData() {
-    const r = rng(47);
-    const pts = [];
-    for (let i = 0; i < 70; i++) {
-      const x = Math.min(10, Math.floor(r() * r() * 11 + r() * 4)); // more customers with few tickets
-      const y = r() < sig(1.15 * (x - 4.6)) ? 1 : 0;
-      pts.push({ x, y, jx: (r() - 0.5) * 0.5, jy: (r() - 0.5) * 0.07 });
-    }
-    // make sure the right edge is populated
-    for (let x = 7; x <= 10; x++) pts.push({ x, y: x === 7 ? 0 : 1, jx: (r() - 0.5) * 0.5, jy: (r() - 0.5) * 0.07 });
-    return pts;
+    return DATA.map(([x, y], i) => ({ x, y, jx: (((i * 29) % 13) / 13 - 0.5) * 2.4, jy: (((i * 17) % 11) / 11 - 0.5) * 0.07 }));
   }
 
   function fitLine(pts) {
@@ -31,17 +29,6 @@
     for (const p of pts) { sxy += (p.x - mx) * (p.y - my); sxx += (p.x - mx) ** 2; }
     const m = sxy / sxx;
     return { m, c: my - m * mx };
-  }
-
-  function fitLogistic(pts) {
-    let w = 0, b = 0;
-    for (let it = 0; it < 6000; it++) {
-      let gw = 0, gb = 0;
-      for (const p of pts) { const e = sig(w * p.x + b) - p.y; gw += e * p.x; gb += e; }
-      w -= (0.08 * gw) / pts.length;
-      b -= (0.4 * gb) / pts.length;
-    }
-    return { w, b };
   }
 
   const logLoss = (pts, f) => {
@@ -58,15 +45,15 @@
     body.classList.add("hz-sg");
     const pts = makeData();
     const line = fitLine(pts);
-    const best = fitLogistic(pts);
-    let w = +best.w.toFixed(2), b = +best.b.toFixed(1);
+    const best = BEST;
+    let w = best.w, b = best.b;
     let mode = "linear";
-    let probe = 10;
+    let probe = 100;
     let last = "mode";
 
     const xs = scale([X0, X1], [M.l, W - M.r]);
     const ys = scale([Y0, Y1], [H - M.b, M.t]);
-    const fig = svg("svg", { viewBox: `0 0 ${W} ${H}`, class: "hz-sg-plot", role: "img", "aria-label": "Churned (1) or stayed (0) against support tickets, with a fitted curve" });
+    const fig = svg("svg", { viewBox: `0 0 ${W} ${H}`, class: "hz-sg-plot", role: "img", "aria-label": "Cancelled (1) or not (0) against lead time, with a fitted curve" });
 
     // Out-of-range bands: values a probability can never take
     fig.append(
@@ -75,21 +62,29 @@
       svg("text", { class: "hz-sg-bandtxt", x: W - M.r - 6, y: ys(Y1) + 15, "text-anchor": "end", text: "above 1: not a probability" }),
       svg("text", { class: "hz-sg-bandtxt", x: W - M.r - 6, y: ys(Y0) - 6, "text-anchor": "end", text: "below 0: not a probability" })
     );
+    // Bookings made more than 120 days ahead are left out on purpose (section 07)
+    const hx = xs(HIDE);
+    fig.append(
+      svg("rect", { class: "hz-sg-hidden", x: hx, width: W - M.r - hx, y: ys(1), height: ys(0) - ys(1) }),
+      svg("text", { class: "hz-sg-hiddentxt", x: (hx + W - M.r) / 2, y: ys(0.36), "text-anchor": "middle", text: "over 120 days:" }),
+      svg("text", { class: "hz-sg-hiddentxt", x: (hx + W - M.r) / 2, y: ys(0.36) + 16, "text-anchor": "middle", text: "data hidden," }),
+      svg("text", { class: "hz-sg-hiddentxt", x: (hx + W - M.r) / 2, y: ys(0.36) + 32, "text-anchor": "middle", text: "see section 07" })
+    );
     [0, 0.5, 1].forEach((v) => {
       fig.append(svg("line", { class: v === 0.5 ? "hz-sg-half" : "hz-axis", x1: M.l, x2: W - M.r, y1: ys(v), y2: ys(v) }));
       fig.append(svg("text", { x: M.l - 8, y: ys(v) + 4, "text-anchor": "end", text: v === 0.5 ? "0.5" : String(v) }));
     });
-    for (let t = 0; t <= 10; t += 2) fig.append(svg("text", { x: xs(t), y: H - M.b + 18, "text-anchor": "middle", text: String(t) }));
-    fig.append(svg("text", { x: (M.l + W - M.r) / 2, y: H - 6, "text-anchor": "middle", text: "support tickets in the last 6 months" }));
-    fig.append(svg("text", { x: 14, y: (M.t + H - M.b) / 2, transform: `rotate(-90 14 ${(M.t + H - M.b) / 2})`, "text-anchor": "middle", text: "churned? (1 = left)" }));
+    for (let t = 0; t <= 200; t += 40) fig.append(svg("text", { x: xs(t), y: H - M.b + 18, "text-anchor": "middle", text: String(t) }));
+    fig.append(svg("text", { x: (M.l + W - M.r) / 2, y: H - 6, "text-anchor": "middle", text: "lead time: days between booking and arrival" }));
+    fig.append(svg("text", { x: 14, y: (M.t + H - M.b) / 2, transform: `rotate(-90 14 ${(M.t + H - M.b) / 2})`, "text-anchor": "middle", text: "cancelled? (1 = yes)" }));
 
     const boundary = svg("line", { class: "hz-sg-boundary", y1: M.t, y2: H - M.b });
     fig.append(boundary);
-    pts.forEach((p) => fig.append(svg("circle", { class: "hz-sg-dot " + (p.y ? "is-left" : "is-stay"), cx: xs(clamp(p.x + p.jx, X0 + 0.1, X1 - 0.1)), cy: ys(p.y + p.jy), r: 4.5 })));
+    pts.forEach((p) => fig.append(svg("circle", { class: "hz-sg-dot " + (p.y ? "is-left" : "is-stay"), cx: xs(clamp(p.x + p.jx, 0, 120)), cy: ys(p.y + p.jy), r: 4.5 })));
 
     const curve = svg("path", { class: "hz-sg-curve" });
     const probeLine = svg("line", { class: "hz-sg-probeline" });
-    const probeDot = svg("circle", { class: "hz-sg-probe", r: 7, tabindex: 0, role: "slider", "aria-label": "Probe customer: support tickets" });
+    const probeDot = svg("circle", { class: "hz-sg-probe", r: 7, tabindex: 0, role: "slider", "aria-label": "Probe booking: lead time in days" });
     const probeTxt = svg("text", { class: "hz-sg-probetxt" });
     fig.append(curve, probeLine, probeDot, probeTxt);
 
@@ -113,10 +108,10 @@
       morph();
     });
     seg.node.setAttribute("aria-label", "Model");
-    const sw = slider({ label: "Weight w", min: 0, max: 3, step: 0.05, value: w, format: (v) => v.toFixed(2), oninput: (v) => { w = v; last = "w"; morph(true); } });
-    const sb = slider({ label: "Intercept b", min: -14, max: 2, step: 0.1, value: b, format: (v) => v.toFixed(1), oninput: (v) => { b = v; last = "b"; morph(true); } });
-    const sp = slider({ label: "Probe: tickets", min: 0, max: 10, step: 1, value: probe, format: (v) => String(v), oninput: (v) => { probe = v; last = "probe"; draw(); } });
-    const fitBtn = button("Best fit", () => animateParams(+best.w.toFixed(2), +best.b.toFixed(1)), "primary");
+    const sw = slider({ label: "Weight w (per day)", min: 0, max: 0.08, step: 0.0005, value: w, format: (v) => v.toFixed(4), oninput: (v) => { w = v; last = "w"; morph(true); } });
+    const sb = slider({ label: "Intercept b", min: -6, max: 1, step: 0.01, value: b, format: (v) => v.toFixed(2), oninput: (v) => { b = v; last = "b"; morph(true); } });
+    const sp = slider({ label: "Probe: lead time (days)", min: 0, max: 200, step: 5, value: probe, format: (v) => v + " d", oninput: (v) => { probe = v; last = "probe"; draw(); } });
+    const fitBtn = button("Best fit", () => animateParams(best.w, best.b), "primary");
 
     // Morph the curve between shapes so the line visibly bends into an S.
     let anim = 0;
@@ -152,7 +147,7 @@
       curve.setAttribute("d", path(shown));
       curve.classList.toggle("is-linear", !logistic);
 
-      const cut = logistic && w > 0.01 ? -b / w : NaN;
+      const cut = logistic && w > 0.0005 ? -b / w : NaN;
       const showCut = Number.isFinite(cut) && cut > X0 && cut < X1;
       boundary.style.opacity = showCut ? 1 : 0;
       if (showCut) { boundary.setAttribute("x1", xs(cut)); boundary.setAttribute("x2", xs(cut)); }
@@ -165,48 +160,49 @@
       probeDot.setAttribute("aria-valuenow", probe);
       const bad = v < 0 || v > 1;
       probeDot.classList.toggle("is-bad", bad);
-      const right = px > W - 170;
+      const right = px > W - 190;
       probeTxt.setAttribute("x", right ? px - 12 : px + 12);
       probeTxt.setAttribute("text-anchor", right ? "end" : "start");
       probeTxt.setAttribute("y", clamp(py + (v > 0.75 ? 22 : -12), M.t + 12, H - M.b - 6));
-      probeTxt.textContent = logistic ? `p = ${fp(v)} → ${v >= 0.5 ? "leaves" : "stays"}` : `prediction ${v.toFixed(2)}${bad ? " ?!" : ""}`;
+      probeTxt.textContent = logistic ? `p = ${fp(v)} → ${v >= 0.5 ? "cancels" : "shows up"}` : `prediction ${v.toFixed(2)}${bad ? " ?!" : ""}`;
       probeTxt.classList.toggle("is-bad", bad);
 
       const loss = logLoss(pts, f);
       if (logistic) {
-        formula.innerHTML = `z = <b>${w.toFixed(2)}</b> × tickets ${b < 0 ? "−" : "+"} <b>${Math.abs(b).toFixed(1)}</b> &nbsp;→&nbsp; p = 1 / (1 + e<sup>−z</sup>)`;
+        formula.innerHTML = `z = <b>${w.toFixed(4)}</b> × days ${b < 0 ? "−" : "+"} <b>${Math.abs(b).toFixed(2)}</b> &nbsp;→&nbsp; p = 1 / (1 + e<sup>−z</sup>)`;
         readout.set([
-          ["Probe customer", `${probe} tickets`],
+          ["Probe booking", `${probe} days ahead`],
           ["Score z", (w * probe + b).toFixed(2)],
           ["Probability p", fp(v), "is-a"],
-          ["Predicted", v >= 0.5 ? "leaves" : "stays"],
+          ["Predicted", v >= 0.5 ? "cancels" : "shows up"],
           ["Log loss (lower = better fit)", Number.isFinite(loss) ? loss.toFixed(3) : "–"],
         ]);
       } else {
-        formula.innerHTML = `prediction = <b>${line.m.toFixed(3)}</b> × tickets ${line.c < 0 ? "−" : "+"} <b>${Math.abs(line.c).toFixed(3)}</b>`;
+        formula.innerHTML = `prediction = <b>${line.m.toFixed(4)}</b> × days ${line.c < 0 ? "−" : "+"} <b>${Math.abs(line.c).toFixed(3)}</b>`;
         readout.set([
-          ["Probe customer", `${probe} tickets`],
+          ["Probe booking", `${probe} days ahead`],
           ["Prediction", v.toFixed(2), bad ? "is-bad" : "is-a"],
           ["Valid probability?", bad ? "no" : "yes", bad ? "is-bad" : "is-good"],
           ["Log loss", "impossible", "is-bad"],
         ]);
       }
 
-      const lo = line.c + line.m * 0, hi = line.c + line.m * 10;
+      const lo = line.c + line.m * 0, hi = line.c + line.m * 200;
+      const days = `${probe} day${probe === 1 ? "" : "s"}`;
       if (!logistic) {
-        note.innerHTML = `The least-squares line is the best straight line through the 0s and 1s, yet it predicts <strong>${lo.toFixed(2)}</strong> for a customer with no tickets and <strong>${hi.toFixed(2)}</strong> for one with ten. Neither is a probability. Switch to logistic regression.`;
+        note.innerHTML = `The least-squares line is the best straight line through the 0s and 1s, yet it predicts <strong>${lo.toFixed(2)}</strong> for a booking made on the day of arrival and <strong>${hi.toFixed(2)}</strong> for one made 200 days ahead. A probability above 1 means nothing. Switch to logistic regression.`;
       } else if (last === "w") {
-        note.innerHTML = w < 0.05
-          ? "With weight 0 the tickets stop mattering: every customer gets the same probability, a flat line."
-          : `The <strong>weight</strong> sets how steep the S is. A bigger weight means each extra ticket moves the probability faster around the 50% point.`;
+        note.innerHTML = w < 0.001
+          ? "With weight 0 lead time stops mattering: every booking gets the same probability, a flat line."
+          : `The <strong>weight</strong> sets how steep the S is. A bigger weight means each extra day of lead time moves the probability faster around the 50% point.`;
       } else if (last === "b") {
         note.innerHTML = showCut
-          ? `The <strong>intercept</strong> slides the S sideways. The 50% point sits at −b / w = <strong>${cut.toFixed(1)} tickets</strong>; to its right the model predicts “leaves”.`
-          : "The intercept has pushed the 50% point off the chart: the model now says the same class for every customer.";
+          ? `The <strong>intercept</strong> slides the S sideways. The 50% point sits at −b / w = <strong>${Math.round(cut)} days</strong>; bookings made further ahead are predicted to cancel.`
+          : "The intercept has pushed the 50% point off the chart: the model now says the same thing for every booking.";
       } else if (last === "probe") {
-        note.innerHTML = `A customer with ${probe} ticket${probe === 1 ? "" : "s"}: score z = ${(w * probe + b).toFixed(2)}, probability <strong>${fp(v)}</strong>. At the usual threshold of 0.5 the model predicts “${v >= 0.5 ? "leaves" : "stays"}”.`;
+        note.innerHTML = `A booking made ${days} ahead: score z = ${(w * probe + b).toFixed(2)}, probability of cancelling <strong>${fp(v)}</strong>. At the usual threshold of 0.5 the model predicts “${v >= 0.5 ? "cancels" : "shows up"}”.${probe > 120 ? " Careful: past 120 days the S keeps climbing, but the real risk does not (section 07)." : ""}`;
       } else {
-        note.innerHTML = `Same score as a line, z = w·tickets + b, but bent by the sigmoid. Far left it flattens near 0, far right near 1, and it <strong>never leaves the band</strong>. Move the sliders, or press Best fit.`;
+        note.innerHTML = `Same score as a line, z = w·days + b, but bent by the sigmoid. Far left it flattens near 0, far right near 1, and it <strong>never leaves the band</strong>. Move the sliders, or press Best fit.`;
       }
     }
 
@@ -214,7 +210,7 @@
     let dragging = false;
     const toX = (e) => {
       const r = fig.getBoundingClientRect();
-      return clamp(Math.round(xs.invert(((e.clientX - r.left) / r.width) * W)), 0, 10);
+      return clamp(Math.round(xs.invert(((e.clientX - r.left) / r.width) * W) / 5) * 5, 0, 200);
     };
     fig.addEventListener("pointerdown", (e) => {
       if (e.pointerType !== "mouse" && e.target !== probeDot) return;
@@ -228,18 +224,18 @@
       const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
       if (!step) return;
       e.preventDefault();
-      probe = clamp(probe + step, 0, 10); sp.set(probe); last = "probe"; draw();
+      probe = clamp(probe + 5 * step, 0, 200); sp.set(probe); last = "probe"; draw();
     });
 
     body.append(
-      el("p", { class: "hz-x__lede", html: "Each dot is a customer: on top if they left, at the bottom if they stayed, spread along how many complaints they filed. Try to draw a <em>probability</em> through them." }),
+      el("p", { class: "hz-x__lede", html: "Each dot is a real Altamar booking: on top if it was cancelled, at the bottom if the guest arrived, spread along how many days ahead it was made. Try to draw a <em>probability of cancelling</em> through them." }),
       el("div", { class: "hz-x__controls" }, [seg.node, fitBtn]),
       fig,
       el("div", { class: "hz-legend" }, [
-        el("span", {}, [el("i", { style: "background: var(--hz-a)" }), "left (1)"]),
-        el("span", {}, [el("i", { style: "background: var(--hz-b)" }), "stayed (0)"]),
+        el("span", {}, [el("i", { style: "background: var(--hz-a)" }), "cancelled (1)"]),
+        el("span", {}, [el("i", { style: "background: var(--hz-b)" }), "arrived (0)"]),
         el("span", {}, [el("i", { style: "background: var(--hz-bad-soft)" }), "impossible for a probability"]),
-        el("span", {}, [el("i", { style: "background: var(--hz-a); border-radius: 0; width: 2px" }), "50% point: right of it, “leaves”"]),
+        el("span", {}, [el("i", { style: "background: var(--hz-a); border-radius: 0; width: 2px" }), "50% point: right of it, “cancels”"]),
       ]),
       el("div", { class: "hz-sg-side" }, [formula, readout.node]),
       el("div", { class: "hz-x__controls hz-sg-sliders" }, [sw.node, sb.node, sp.node]),
@@ -250,12 +246,14 @@
   }
 
   HZ.register("sigmoid", {
-    kicker: "Session 4",
+    kicker: "Week 4",
     title: "From a line to a probability",
     mount,
     css: `
 .md-typeset .hz-sg { --hz-bad-soft: color-mix(in srgb, var(--hz-bad) 12%, transparent); }
 .md-typeset .hz-sg-band { fill: var(--hz-bad-soft); }
+.md-typeset .hz-sg-hidden { fill: var(--hz-muted); fill-opacity: 0.1; }
+.md-typeset .hz-x svg text.hz-sg-hiddentxt { fill: var(--hz-muted); font-size: 12px; }
 .md-typeset .hz-x svg text.hz-sg-bandtxt { fill: var(--hz-bad); font-size: 12px; }
 .md-typeset .hz-x svg.hz-sg-plot text { font-size: 13px; }
 .md-typeset .hz-sg-half { stroke: var(--hz-muted); stroke-width: 1; stroke-dasharray: 4 4; }
@@ -278,7 +276,7 @@
 .md-typeset .hz-sg-formula b { color: var(--hz-a); font-weight: 600; }
 .md-typeset .hz-sg.is-linear .hz-sg-sliders .hz-x__slider:not(:last-child) { opacity: 0.4; }
 .md-typeset .hz-sg .hz-x__note { min-height: 4.2em; }
-@media (max-width: 44em) { .md-typeset .hz-x svg.hz-sg-plot text { font-size: 19px; } .md-typeset .hz-x svg text.hz-sg-bandtxt { font-size: 17px; } }
+@media (max-width: 44em) { .md-typeset .hz-x svg.hz-sg-plot text { font-size: 19px; } .md-typeset .hz-x svg text.hz-sg-bandtxt, .md-typeset .hz-x svg text.hz-sg-hiddentxt { font-size: 15px; } }
 `,
   });
 })();

@@ -1,27 +1,30 @@
-/* Session 5: a random forest is many small trees voting. Each tree is grown
-   (for real, with Gini) on its own bootstrap sample of 100 simulated
-   Cordillera customers and may only use three of six features. A customer
-   walks down every tree; the votes stack into a churn probability. */
+/* Week 6: a random forest is many small trees voting. Each tree is grown
+   (for real, with Gini) on its own bootstrap sample of 100 simulated Altamar
+   bookings and may only use three of six features. One booking walks down
+   every tree; the votes stack into a cancellation risk. The simulated
+   bookings follow the same patterns as the course data (risk peaks for
+   bookings made about three months ahead, OTA bookings made early cancel
+   more, non-refundable deposits and special requests cancel less). */
 (function () {
   const { el, svg, button, wait, rng } = HZ;
 
   const N_POOL = 100, N_TREES = 9, DEPTH = 2, MIN_LEAF = 4;
-  const POOL_SEED = 5, FOREST_SEED = 4;
-  // index: 0 tenure, 1 tickets, 2 month-to-month, 3 Norte, 4 autopay, 5 USD above plan
+  const POOL_SEED = 7, FOREST_SEED = 3;
+  // index: 0 lead time (days), 1 via OTA, 2 non-refundable, 3 special requests, 4 cancelled before, 5 % above usual rate
   const FEATS = [
-    { chip: "tenure", q: (t) => `tenure ≥ ${Math.floor(t) + 1}?`, int: true },
-    { chip: "tickets", q: (t) => `tickets ≥ ${Math.floor(t) + 1}?`, int: true },
-    { chip: "no contract", q: () => "no contract?" },
-    { chip: "Norte", q: () => "in the Norte?" },
-    { chip: "autopay", q: () => "autopay?" },
-    { chip: "extra $", q: (t) => `extra ≥ $${Math.floor(t) + 1}?`, int: true },
+    { chip: "lead time", q: (t) => `lead ≥ ${Math.floor(t) + 1}d?`, int: true },
+    { chip: "OTA", q: () => "via OTA?" },
+    { chip: "non-refund", q: () => "non-refund?" },
+    { chip: "requests", q: (t) => `requests ≥ ${Math.floor(t) + 1}?`, int: true },
+    { chip: "past cancel", q: () => "past cancel?" },
+    { chip: "rate", q: (t) => `rate ≥ +${Math.floor(t) + 1}%?`, int: true },
   ];
   const PROFILES = [
-    { name: "Customer A", v: [3, 1, 1, 0, 0, 4], tags: ["3 months with us", "1 ticket", "no contract", "Metropolitana", "no autopay", "bill $4 above plan"] },
-    { name: "Customer B", v: [40, 0, 0, 0, 1, 2], tags: ["40 months with us", "0 tickets", "24-month contract", "Sur", "autopay", "bill $2 above plan"] },
-    { name: "Customer C", v: [15, 2, 0, 1, 1, 13], tags: ["15 months with us", "2 tickets", "12-month contract", "Norte", "autopay", "bill $13 above plan"] },
-    { name: "Customer D", v: [22, 3, 1, 1, 0, 15], tags: ["22 months with us", "3 tickets", "no contract", "Norte", "no autopay", "bill $15 above plan"] },
-    { name: "Customer E", v: [30, 4, 1, 0, 0, 5], tags: ["30 months with us", "4 tickets", "no contract", "Centro", "no autopay", "bill $5 above plan"] },
+    { name: "Booking A", v: [85, 1, 0, 0, 0, 20], tags: ["booked 85 days ahead", "online travel agency", "no deposit", "no special requests", "never cancelled", "rate 20% above usual"] },
+    { name: "Booking B", v: [4, 0, 0, 2, 0, 10], tags: ["booked 4 days ahead", "direct", "no deposit", "2 special requests", "never cancelled", "rate 10% above usual"] },
+    { name: "Booking C", v: [120, 0, 1, 1, 0, 60], tags: ["booked 120 days ahead", "travel agent", "non-refundable", "1 special request", "never cancelled", "rate 60% above usual"] },
+    { name: "Booking D", v: [60, 0, 0, 0, 1, 30], tags: ["booked 60 days ahead", "direct", "no deposit", "no special requests", "cancelled before", "rate 30% above usual"] },
+    { name: "Booking E", v: [210, 1, 0, 1, 0, 5], tags: ["booked 210 days ahead", "online travel agency", "no deposit", "1 special request", "never cancelled", "rate 5% above usual"] },
   ];
 
   function makePool(seed, n) {
@@ -29,16 +32,16 @@
     const pois = (lam) => { const L = Math.exp(-lam); let k = 0, p = 1; do { k++; p *= r(); } while (p > L); return k - 1; };
     const pool = [];
     for (let i = 0; i < n; i++) {
-      const tenure = 1 + Math.floor(r() * 60);
-      const norte = r() < 0.25 ? 1 : 0;
-      const tickets = Math.min(5, pois(norte ? 1.6 : 0.8));
-      const mtm = r() < 0.5 ? 1 : 0;
-      const autopay = r() < 0.45 ? 1 : 0;
-      const extra = Math.round(20 * r() * r());
-      // the same kind of thresholds and interactions as the real data
-      const z = -1.7 + 0.9 * mtm + 0.15 * tickets - 0.012 * tenure - 0.6 * autopay + 1.8 * (tenure < 6)
-        + 1.8 * (norte && tickets >= 2) + 1.4 * (mtm && tickets >= 3) + 1.2 * (extra > 12);
-      pool.push({ v: [tenure, tickets, mtm, norte, autopay, extra], y: r() < 1 / (1 + Math.exp(-z)) ? 1 : 0 });
+      const lead = Math.min(300, Math.round(-60 * Math.log(1 - r())));
+      const ota = r() < 0.4 ? 1 : 0;
+      const nonref = r() < 0.18 ? 1 : 0;
+      const req = Math.min(3, pois(0.7));
+      const prev = r() < 0.12 ? 1 : 0;
+      const over = Math.round(80 * r() * r());
+      // the same kind of hump, thresholds and interactions as the course data
+      const z = -2.0 + 2.6 * Math.exp(-(((lead - 90) / 55) ** 2)) + 1.3 * (ota && lead > 45) - 1.4 * nonref
+        + 1.3 * prev - 0.35 * req + 1.0 * (over > 50);
+      pool.push({ v: [lead, ota, nonref, req, prev, over], y: r() < 1 / (1 + Math.exp(-z)) ? 1 : 0 });
     }
     return pool;
   }
@@ -73,7 +76,7 @@
     const r = rng(FOREST_SEED);
     const trees = [];
     for (let k = 0; k < N_TREES; k++) {
-      // bootstrap: draw N customers with replacement
+      // bootstrap: draw N bookings with replacement
       const counts = new Array(pool.length).fill(0);
       for (let i = 0; i < pool.length; i++) counts[Math.floor(r() * pool.length)]++;
       // random features: three of the six
@@ -127,11 +130,11 @@
         ]);
       } else {
         node = svg("g", { class: "hz-fv-leaf " + (n.cls ? "is-churn" : "is-stay"), transform: `translate(${x},${y})` }, [
-          svg("rect", { x: -24, y: -11, width: 48, height: 22, rx: 11 }),
-          svg("text", { y: 4, "text-anchor": "middle", text: n.cls ? "churn" : "stay" }),
+          svg("rect", { x: -25, y: -11, width: 50, height: 22, rx: 11 }),
+          svg("text", { y: 4, "text-anchor": "middle", text: n.cls ? "cancel" : "keep" }),
         ]);
       }
-      node.append(svg("title", { text: `${n.n} customers in this tree's sample, ${n.c} churned` }));
+      node.append(svg("title", { text: `${n.n} bookings in this tree's sample, ${n.c} cancelled` }));
       nodes.append(node);
       parts["n" + n.id] = node;
       n.xy = [x, y];
@@ -143,9 +146,9 @@
     return { node: g, parts };
   }
 
-  // Bootstrap sample: 100 customers as a 10 × 10 grid.
+  // Bootstrap sample: 100 bookings as a 10 × 10 grid.
   function drawSample(tree, pool) {
-    const s = svg("svg", { viewBox: "0 0 62 62", class: "hz-fv-sample", role: "img", "aria-label": "Which customers this tree was trained on" });
+    const s = svg("svg", { viewBox: "0 0 62 62", class: "hz-fv-sample", role: "img", "aria-label": "Which bookings this tree was trained on" });
     pool.forEach((p, i) => {
       const k = tree.counts[i];
       s.append(svg("rect", {
@@ -160,11 +163,12 @@
     const pool = makePool(POOL_SEED, N_POOL);
     nid = 0;
     const trees = buildForest(pool);
-    // How good are single trees vs the forest on 2,000 fresh customers?
+    // How good are single trees vs the forest on 2,000 fresh bookings?
     const fresh = makePool(999, 2000);
     const voteOf = (v) => trees.reduce((s, t) => s + route(t.root, v).at(-1).cls, 0);
     const accTree = trees.reduce((s, t) => s + fresh.filter((p) => route(t.root, p.v).at(-1).cls === p.y).length, 0) / (fresh.length * N_TREES);
     const accForest = fresh.filter((p) => (voteOf(p.v) * 2 > N_TREES ? 1 : 0) === p.y).length / fresh.length;
+    const accNobody = fresh.filter((p) => p.y === 0).length / fresh.length;
 
     const cards = trees.map((t, k) => {
       const diagram = drawTree(t);
@@ -173,7 +177,7 @@
         el("div", { class: "hz-fv-card__head" }, [
           el("div", {}, [
             el("p", { class: "hz-fv-card__name", text: `Tree ${k + 1}` }),
-            el("p", { class: "hz-fv-card__meta", text: `${drawn} different customers` }),
+            el("p", { class: "hz-fv-card__meta", text: `${drawn} different bookings` }),
             el("div", { class: "hz-fv-chips" }, FEATS.map((F, f) => el("span", { class: "hz-fv-chip" + (t.feats.includes(f) ? " is-on" : ""), text: F.chip }))),
           ]),
           drawSample(t, pool),
@@ -212,7 +216,7 @@
       });
       slots.forEach((s) => { s.className = "hz-fv-slot"; });
       showVotes(0);
-      note.innerHTML = `Each tree was grown on its own <strong>bootstrap sample</strong>: the grid shows the 100 customers, filled = drawn for this tree (darker = drawn twice or more), empty = never drawn. Each tree could also use only <strong>three of the six features</strong> (the highlighted chips). Press "Run the forest".`;
+      note.innerHTML = `Each tree was grown on its own <strong>bootstrap sample</strong>: the grid shows the 100 bookings, filled = drawn for this tree (darker = drawn twice or more), empty = never drawn. Each tree could also use only <strong>three of the six features</strong> (the highlighted chips). Press "Run the forest".`;
       stepBtn.disabled = false;
     }
 
@@ -220,7 +224,7 @@
       const p = done ? votes / done : 0;
       meterFill.style.width = (100 * votes) / N_TREES + "%";
       meterText.innerHTML = done
-        ? `<strong>${votes} of ${done}</strong> tree${done === 1 ? "" : "s"} say churn` + (done === N_TREES ? ` → churn risk <strong>${(votes / N_TREES).toFixed(2)}</strong> → ${votes * 2 > N_TREES ? "<span class=\"is-call\">call this customer</span>" : "no call needed"}` : ` so far (${p.toFixed(2)})`)
+        ? `<strong>${votes} of ${done}</strong> tree${done === 1 ? "" : "s"} say cancel` + (done === N_TREES ? ` → cancellation risk <strong>${(votes / N_TREES).toFixed(2)}</strong> → ${votes * 2 > N_TREES ? "<span class=\"is-call\">likely to cancel</span>" : "likely to show up"}` : ` so far (${p.toFixed(2)})`)
         : "No votes yet";
     }
 
@@ -250,12 +254,12 @@
       c.card.classList.add("is-done");
       votes += leaf.cls;
       slots[k].classList.add("is-on", leaf.cls ? "is-churn" : "is-stay");
-      slots[k].textContent = leaf.cls ? "C" : "S";
+      slots[k].textContent = leaf.cls ? "C" : "K";
       showVotes(k + 1);
       const missing = FEATS.filter((_, f) => !c.tree.feats.includes(f)).map((F) => F.chip);
       note.innerHTML = k === N_TREES - 1
-        ? `The forest's answer is the share of trees that say churn: <strong>${votes}/${N_TREES} = ${(votes / N_TREES).toFixed(2)}</strong>. Single trees disagree because each saw different customers and features. On 2,000 new simulated customers a single tree here is right ${Math.round(accTree * 100)}% of the time; the vote of all nine, ${Math.round(accForest * 100)}%.`
-        : `Tree ${k + 1} never got to use ${missing.join(", ")}. Following its questions, ${PROFILES[who].name} lands in a leaf where most customers of its sample ${leaf.cls ? "<strong>churned</strong>" : "<strong>stayed</strong>"} (${leaf.c} of ${leaf.n}), so it votes <strong>${leaf.cls ? "churn" : "stay"}</strong>.`;
+        ? `The forest's answer is the share of trees that say cancel: <strong>${votes}/${N_TREES} = ${(votes / N_TREES).toFixed(2)}</strong>. Single trees disagree because each saw different bookings and features. On 2,000 new simulated bookings a single tree here is right ${Math.round(accTree * 100)}% of the time; the vote of all nine, ${Math.round(accForest * 100)}% (saying "nobody cancels" is right ${Math.round(accNobody * 100)}%).`
+        : `Tree ${k + 1} never got to use ${missing.join(", ")}. Following its questions, ${PROFILES[who].name} lands in a leaf where most bookings of its sample ${leaf.cls ? "<strong>cancelled</strong>" : "<strong>showed up</strong>"} (${leaf.c} of ${leaf.n} cancelled), so it votes <strong>${leaf.cls ? "cancel" : "keep"}</strong>.`;
     }
 
     let busyId = null;
@@ -295,7 +299,7 @@
 
     const runBtn = button("Run the forest", runAll, "primary");
     const stepBtn = button("One tree at a time", step);
-    const newBtn = button("New customer", () => {
+    const newBtn = button("Next booking", () => {
       who = (who + 1) % PROFILES.length;
       setProfile();
       reset();
@@ -303,7 +307,7 @@
     });
 
     body.append(
-      el("p", { class: "hz-x__lede", html: "Nine small trees, each grown on a different random sample of customers. One customer walks down every tree; each tree lights its path and casts a vote, and the votes add up to a churn risk." }),
+      el("p", { class: "hz-x__lede", html: "Nine small trees, each grown on a different random sample of Altamar bookings. One booking walks down every tree; each tree lights its path and casts a vote, cancel or keep, and the votes add up to a cancellation risk." }),
       el("div", { class: "hz-fv-profile" }, [el("span", { class: "hz-fv-profile__label", text: "Scoring" }), profileName, profileTags]),
       el("div", { class: "hz-x__controls" }, [runBtn, stepBtn, newBtn]),
       gridEl,
@@ -312,8 +316,8 @@
         el("div", { class: "hz-fv-meter" }, [el("span", { class: "hz-fv-meter__track" }, [meterFill, el("span", { class: "hz-fv-meter__half" })]), meterText]),
       ]),
       el("div", { class: "hz-legend" }, [
-        el("span", {}, [el("i", { style: "background: var(--hz-a)" }), "churned / votes churn"]),
-        el("span", {}, [el("i", { style: "background: var(--hz-b)" }), "stayed / votes stay"]),
+        el("span", {}, [el("i", { style: "background: var(--hz-a)" }), "cancelled / votes cancel"]),
+        el("span", {}, [el("i", { style: "background: var(--hz-b)" }), "showed up / votes keep"]),
         el("span", {}, [el("i", { style: "border: 1.5px solid var(--hz-muted); border-radius: 2px" }), "not in this tree's sample"]),
       ]),
       note
@@ -323,7 +327,7 @@
   }
 
   HZ.register("forest-vote", {
-    kicker: "Session 5",
+    kicker: "Week 6",
     title: "A forest: many trees voting",
     mount,
     css: `

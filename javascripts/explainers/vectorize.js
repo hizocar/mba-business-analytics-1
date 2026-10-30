@@ -1,38 +1,42 @@
 /*
- * vectorize (Session 1): the same operation on 12 bills, two ways. The Python
- * loop lane touches one bill per step; the NumPy lane applies the operation to
- * the whole array in one call. "Race" runs both side by side.
+ * vectorize (Week 1): the same operation on 12 Altamar nightly rates, two ways.
+ * The Python loop lane touches one booking per step; the NumPy lane applies the
+ * operation to the whole column in one call. "Race" runs both side by side.
  */
 (function () {
   const { el } = HZ;
   const P = "hz-vectorize-";
   const cls = (s) => P + s.split(" ").join(" " + P);
 
-  const BILLS = [29.4, 30.8, 30.1, 35.6, 32.3, 31.9, 44.1, 22.75, 11.2, 36.4, 18.9, 52.3];
+  const BILLS = [95, 120.5, 88, 142, 110, 185, 76.5, 210, 99, 132.5, 160, 89.5];
   const N = BILLS.length;
   const cents = (x) => x.toFixed(2);
+  const show = (x) => (Number.isInteger(x) ? x.toFixed(1) : String(x));
+  const above = BILLS.filter((b) => b > 150).length;
+  const total = BILLS.reduce((a, b) => a + b, 0);
+  const money = (x) => x.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const OPS = {
     mul: {
-      label: "* 1.05",
-      loop: ["new = []", "for b in bills:", "    new.append(b * 1.05)"],
-      np: ["new = bills * 1.05"],
-      cell: (b) => ({ text: cents(b * 1.05), cls: "is-new" }),
-      done: "Every bill went up 5%. Same 12 numbers in both lanes.",
+      label: "raise 8%",
+      loop: ["new = []", "for r in rates:", "    new.append(r * 1.08)"],
+      np: ["new = rates * 1.08"],
+      cell: (b) => ({ text: cents(b * 1.08), cls: "is-new" }),
+      done: "Every rate went up 8%. Same 12 new prices in both lanes.",
     },
     gt: {
-      label: "> 40",
-      loop: ["flags = []", "for b in bills:", "    flags.append(b > 40)"],
-      np: ["flags = bills > 40"],
-      cell: (b) => (b > 40 ? { text: "True", cls: "is-true" } : { text: "False", cls: "is-false" }),
-      done: "A comparison gives one True/False per customer: a mask. 2 bills are above 40 USD.",
+      label: "above 150?",
+      loop: ["flags = []", "for r in rates:", "    flags.append(r > 150)"],
+      np: ["flags = rates > 150"],
+      cell: (b) => (b > 150 ? { text: "True", cls: "is-true" } : { text: "False", cls: "is-false" }),
+      done: "A comparison gives one True/False per booking: a yes/no column. " + above + " of the 12 rates are above 150 USD.",
     },
     sum: {
-      label: "sum",
-      loop: ["total = 0", "for b in bills:", "    total = total + b"],
-      np: ["total = bills.sum()"],
+      label: "total",
+      loop: ["total = 0", "for r in rates:", "    total = total + r"],
+      np: ["total = rates.sum()"],
       cell: () => ({ text: null, cls: "is-used" }),
-      done: "Both lanes add up to 375.75 USD of revenue.",
+      done: "Both lanes add up to " + money(total) + " USD: one night of room revenue from these 12 bookings.",
     },
   };
 
@@ -49,7 +53,7 @@
       const code = el("pre", { class: cls("code") });
       const steps = el("span", { class: cls("steps"), text: "0 steps" });
       const flag = el("span", { class: cls("flag") });
-      const cells = BILLS.map((b) => el("span", { class: cls("cell") }, [el("span", { class: cls("v"), text: String(b) })]));
+      const cells = BILLS.map((b) => el("span", { class: cls("cell") }, [el("span", { class: cls("v"), text: show(b) })]));
       const acc = el("span", { class: cls("acc") });
       const node = el("div", { class: cls("lane") }, [
         el("div", { class: cls("head") }, [
@@ -63,13 +67,13 @@
       ]);
       return { node, code, steps, flag, cells, acc };
     }
-    const L = lane("Python loop", "one bill per step");
+    const L = lane("Python loop", "one booking per step");
     const A = lane("NumPy array", "the whole column in one call");
 
     body.append(
-      el("p", { class: "hz-x__lede", html: "Twelve customers' bills, the same job done two ways. Press <strong>Race</strong>: the loop visits one bill at a time, the array does them all at once. (New prices are shown rounded to cents.)" }),
+      el("p", { class: "hz-x__lede", html: "Twelve bookings' nightly rates, the same job done two ways. Pick a job and press <strong>Race</strong>: the loop visits one booking at a time, the array does them all at once. (New rates are shown rounded to cents.)" }),
       el("div", { class: "hz-x__controls" }, [seg.node, race, resetBtn]),
-      el("pre", { class: cls("def"), text: "bills = np.array([" + BILLS.join(", ") + "])" }),
+      el("pre", { class: cls("def"), text: "rates = np.array([" + BILLS.map(show).join(", ") + "])" }),
       L.node,
       A.node,
       note
@@ -86,7 +90,7 @@
         ln.code.replaceChildren(...src.map((t) => el("span", { class: cls("line"), text: t })));
         ln.cells.forEach((c, i) => {
           c.className = cls("cell");
-          c.firstChild.textContent = String(BILLS[i]);
+          c.firstChild.textContent = show(BILLS[i]);
         });
         ln.node.classList.remove("is-done", "is-busy");
         ln.flag.textContent = "";
@@ -150,7 +154,7 @@
       A.node.classList.remove("is-busy");
       A.node.classList.add("is-done");
       A.flag.textContent = "done";
-      note.textContent = "The array lane is already done after one step. The loop is still walking the list, one Python step per customer…";
+      note.textContent = "The array lane is already done after one step. The loop is still walking the list, one Python step per booking…";
     }
 
     async function run() {
@@ -161,14 +165,14 @@
       await Promise.all([runLoop(id), runArray(id)]);
       if (id !== runId || !body.isConnected) return;
       race.disabled = false;
-      note.textContent = OPS[op].done + " The loop made " + N + " trips through Python; NumPy made one call and ran its loop in fast compiled code. With 5,000 customers that is 5,000 trips against still one call.";
+      note.textContent = OPS[op].done + " The loop made " + N + " trips through Python; NumPy made one call and ran its loop in fast compiled code. With Altamar's 6,060 bookings that is 6,060 trips against still one call.";
     }
 
     reset();
   }
 
   HZ.register("vectorize", {
-    kicker: "Session 1",
+    kicker: "Week 1",
     title: "One at a time vs all at once",
     mount,
     css: `

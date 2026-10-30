@@ -1,73 +1,77 @@
 /*
- * cleaning-audit: the session 2 cleaning pipeline on the raw Cordillera file.
- * Ten real rows show what each step does (cells fixed, rows dropped), while
- * the counters track the whole file (5,075 → 4,985 rows, 925 → 0 dirty
- * values) and the cleaning summary table fills in, one line per decision.
+ * cleaning-audit: Altamar's cleaning pipeline (clean() in the generator) on
+ * the raw bookings file. Eleven real rows show what each step does (cells
+ * fixed, rows dropped), while the counters track the whole file
+ * (6,060 -> 5,964 bookings, 720 -> 0 problems) and the cleaning log fills
+ * in, one line per decision.
  */
 (function () {
   const { el } = HZ;
 
-  // Real rows from cordillera_mobile.csv. fix: {step: {field: value}}, drop: step that removes the row.
+  // Real rows from altamar_bookings.csv. fix: {step: {field: value}}; drop: the step
+  // that removes the row; bad: the field that makes it impossible.
   const SAMPLE = [
-    { id: "CM-12254", region: "Metropolitana", plan: "Basic", age: "34", gb: "NaN", pay: "NaN", bill: "25.46", fix: { 4: { gb: "7.1", pay: "Unknown" } } },
-    { id: "CM-10542", region: "Norte", plan: "unlimited", age: "40", gb: "23.6", pay: "Credit card", bill: "47.77", fix: { 2: { plan: "Unlimited" } } },
-    { id: "CM-10542", region: "Norte", plan: "unlimited", age: "40", gb: "23.6", pay: "Credit card", bill: "47.77", drop: 1, why: "exact copy of the row above" },
-    { id: "CM-13346", region: "NORTE", plan: "plus", age: "40", gb: "20.5", pay: "Bank transfer", bill: "45.07", fix: { 2: { region: "Norte", plan: "Plus" } } },
-    { id: "CM-14900", region: "Sur", plan: "Plus", age: "0", gb: "14.7", pay: "Debit card", bill: "43.81", fix: { 3: { age: "38" } } },
-    { id: "CM-10941", region: "Sur ", plan: "Plus", age: "39", gb: "17.7", pay: "NaN", bill: "51.61", fix: { 2: { region: "Sur" }, 4: { pay: "Unknown" } } },
-    { id: "CM-10737", region: "Norte", plan: "Basic", age: "39", gb: "7.3", pay: "Bank transfer", bill: "-36.08", drop: 5, why: "negative bill" },
-    { id: "CM-12112", region: "Metropolitana", plan: "PLUS", age: "42", gb: "18.9", pay: "Debit card", bill: "4689.00", fix: { 2: { plan: "Plus" } }, drop: 5, why: "decimal point lost (46.89)" },
-    { id: "CM-12183", region: "Centro", plan: "Prepaid", age: "-1", gb: "2.4", pay: "Debit card", bill: "9.77", fix: { 3: { age: "38" } } },
-    { id: "CM-10173", region: "Centro", plan: "Plus", age: "31", gb: "19.0", pay: "Debit card", bill: "37.05" },
+    { id: "AH-200037", hotel: "Santiago", channel: "Online travel agency", lead: "75", adults: "2", children: "1", country: "Argentina", adr: "96.22" },
+    { id: "AH-200037", hotel: "Santiago", channel: "Online travel agency", lead: "75", adults: "2", children: "1", country: "Argentina", adr: "96.22", drop: 1, why: "exact copy of the row above" },
+    { id: "AH-204139", hotel: "VIÑA DEL MAR", channel: "Online travel agency", lead: "28", adults: "2", children: "0", country: "Chile", adr: "114.51", fix: { 2: { hotel: "Viña del Mar" } } },
+    { id: "AH-205825", hotel: "Viña del Mar", channel: "OTA", lead: "35", adults: "2", children: "0", country: "Chile", adr: "64.72", fix: { 2: { channel: "Online travel agency" } } },
+    { id: "AH-205221", hotel: "Santiago", channel: "Online travel agency", lead: "27", adults: "2", children: "1", country: "Chile", adr: "0.00", drop: 3, bad: "adr", why: "complimentary room: not a price" },
+    { id: "AH-203052", hotel: "Viña del Mar", channel: "Corporate", lead: "3", adults: "1", children: "0", country: "Chile", adr: "1,335.70", drop: 3, bad: "adr", why: "an extra zero (133.57)" },
+    { id: "AH-202870", hotel: "Santiago", channel: "Travel agent", lead: "-75", adults: "2", children: "0", country: "Chile", adr: "147.59", drop: 4, bad: "lead", why: "booked after arrival? dates swapped" },
+    { id: "AH-204369", hotel: "Pto. Varas", channel: "Travel agent", lead: "83", adults: "0", children: "0", country: "Chile", adr: "102.17", fix: { 2: { hotel: "Puerto Varas" } }, drop: 4, bad: "adults", why: "a room with no adults" },
+    { id: "AH-200104", hotel: "Viña del Mar", channel: "Online travel agency", lead: "11", adults: "2", children: "NaN", country: "Brazil", adr: "92.35", fix: { 5: { children: "0" } } },
+    { id: "AH-200450", hotel: "Puerto Varas", channel: "Direct", lead: "41", adults: "2", children: "2", country: "NaN", adr: "113.35", fix: { 5: { country: "Unknown" } } },
+    { id: "AH-204908", hotel: "Santiago", channel: "Online travel agency", lead: "5", adults: "1", children: "0", country: "Chile", adr: "115.22" },
   ];
-  const FIELDS = ["region", "plan", "age", "gb", "pay", "bill"];
+  const FIELDS = ["hotel", "channel", "lead", "adults", "children", "country", "adr"];
 
   const STEPS = [
     {
-      name: "Duplicates", code: "df = df.drop_duplicates()", rows: 5000, dirty: 843,
-      summary: [["Exact duplicate rows", "Drop, keep the first copy", 75]],
-      cap: ["75 rows are exact copies of another row. A customer counted twice weighs double in every average, so the copies go."],
+      name: "Duplicates", code: "df = raw.drop_duplicates().copy()", rows: 6000, dirty: 660,
+      summary: [["Exact duplicate rows", "Drop the copy, keep the first", 60]],
+      cap: ["60 bookings were loaded twice. A booking counted twice weighs double in every average rate and every cancellation rate, so the copies go."],
     },
     {
-      name: "Text", code: 'for col in ["region", "plan"]:\n    df[col] = df[col].str.strip().str.title()', rows: 5000, dirty: 380,
-      summary: [["region written 11 ways", "Strip spaces, Title Case", 236], ["plan written 10 ways", "Strip spaces, Title Case", 227]],
-      cap: ["“NORTE”, “norte” and “Norte” are one region to the business but three to pandas. ", ["strip()"], " removes stray spaces, ", ["title()"], " fixes capitals: 11 spellings of region become 4."],
+      name: "Labels", code: 'df["hotel"] = df["hotel"].replace(HOTEL_FIX)\ndf["channel"] = (df["channel"].str.lower()\n    .replace({"ota": "online travel agency"}).str.capitalize())', rows: 6000, dirty: 276,
+      summary: [["Hotel written 4 other ways", "Map to the 3 official names", 250], ["Channel written 3 other ways", "Lower case, OTA to the full name", 134]],
+      cap: ["“SANTIAGO” and “Santiago” are one hotel to a manager but two to pandas: a summary by hotel would list seven hotels. After this step there are 3 hotels and 4 channels. No booking is lost."],
     },
     {
-      name: "Ages", code: 'df.loc[~df["age"].between(18, 100), "age"] = np.nan\ndf["age"] = df["age"].fillna(df["age"].median()).astype("int64")', rows: 5000, dirty: 365,
-      summary: [["Impossible age (0, -1, 999)", "Set to NaN, fill with the median (38)", 15]],
-      cap: ["Nobody is 0, −1 or 999 years old: typing errors. We cannot recover the true age, so it becomes missing and gets the median, which those extremes cannot pull."],
+      name: "Impossible rates", code: 'df = df[(df["adr"] > 0) & (df["adr"] < 1000)]', rows: 5982, dirty: 258,
+      summary: [["Rate of 0 (complimentary room)", "Drop the row: not a price", 12], ["Rate of 1,000 USD or more (extra zero)", "Drop the row", 6]],
+      cap: ["A free room is not a price: twelve zeros would pull every average rate down. Six rates carry an extra zero (1,335.70 for a 133.57 room). We are studying prices, so all 18 go rather than a guess."],
     },
     {
-      name: "Missing", code: 'df["data_gb"] = df["data_gb"].fillna(\n    df.groupby("plan")["data_gb"].transform("median"))\ndf["payment_method"] = df["payment_method"].fillna("Unknown")', rows: 5000, dirty: 15,
-      summary: [["Missing data_gb", "Median of the customer's plan", 200], ["Missing payment_method", "New category “Unknown”", 150]],
-      cap: ["A Prepaid customer uses far less data than an Unlimited one, so a missing ", ["data_gb"], " gets the median of its own plan. A missing payment method gets an honest label instead of a guess."],
+      name: "Lead times, adults", code: 'df = df[df["lead_time_days"] >= 0]\ndf = df[df["adults"] > 0]', rows: 5964, dirty: 240,
+      summary: [["Negative lead time (dates swapped)", "Drop the row", 10], ["Booking with 0 adults", "Drop the row", 8]],
+      cap: ["Nobody books after arriving, and every room needs at least one adult. 18 impossible bookings, 0.3% of the file: dropping them moves no summary, and the log says we did it."],
     },
     {
-      name: "Bills", code: 'df = df[df["monthly_bill"].between(0, 300)]', rows: 4985, dirty: 0,
-      summary: [["Impossible bill (< 0 or > 300 USD)", "Drop the row", 15]],
-      cap: ["10 negative bills and 5 that lost their decimal point (4,689 instead of 46.89). The bill is the commercial team's target, so we drop these 15 rows rather than guess. Clean file: 4,985 rows."],
+      name: "Missing", code: 'df["children"] = df["children"].fillna(0).astype("int64")\ndf["country"] = df["country"].fillna("Unknown")', rows: 5964, dirty: 0,
+      summary: [["Missing children", "Fill with 0, the usual value", 60], ["Missing country", "New category “Unknown”", 180]],
+      cap: ["Three in four bookings have no children, so a blank most likely means none. A missing country gets an honest label instead of a guess. The clean file: 5,964 bookings, nothing missing."],
     },
   ];
-  const START = { rows: 5075, dirty: 925 };
+  const START = { rows: 6060, dirty: 720 };
 
   const nf = (v) => Math.round(v).toLocaleString("en-US");
   const showVal = (f, v) => {
-    if (f === "age") return "age " + v;
-    if (f === "gb") return v + " GB";
-    if (f === "pay") return v === "NaN" ? "NaN payment" : v;
-    if (f === "bill") return "$" + v;
-    return v.endsWith(" ") ? v.trimEnd() + "␣" : v;
+    if (f === "lead") return "lead " + v + " d";
+    if (f === "adults") return v + (v === "1" ? " adult" : " adults");
+    if (f === "children") return "children " + v;
+    if (f === "country") return v === "NaN" ? "country NaN" : v;
+    if (f === "adr") return "USD " + v;
+    return v;
   };
   // the step at which a field of a row stops being dirty
   function dirtStep(r, f) {
     for (const [s, fx] of Object.entries(r.fix || {})) if (f in fx) return +s;
-    if (r.drop === 5 && f === "bill") return 5;
+    if (r.drop && r.bad === f) return r.drop;
     return 0;
   }
 
   HZ.register("cleaning-audit", {
-    kicker: "Session 2",
+    kicker: "Week 2",
     title: "The cleaning pipeline",
     mount(body) {
       body.classList.add("hz-cleaning-audit");
@@ -79,8 +83,8 @@
       const rich = (parts) => parts.map((p) => (Array.isArray(p) ? code(p[0]) : p));
 
       body.append(el("p", { class: "hz-x__lede" }, [
-        "Ten real rows from the raw file, each with a different problem (dashed). The counters track the ", el("b", { text: "whole file" }),
-        ". Each step fixes one kind of problem and writes one line of the cleaning summary.",
+        "Eleven real bookings from the raw file, most with a different problem (dashed). The counters track the ", el("b", { text: "whole file" }),
+        ". Each step fixes one kind of problem and writes its lines in the cleaning log.",
       ]));
 
       const pills = STEPS.map((s, k) => el("span", { class: "hz-cleaning-audit-pill" }, [el("b", { text: String(k + 1) }), s.name]));
@@ -96,8 +100,8 @@
       const dirtyNum = el("strong", { text: nf(START.dirty) });
       const bar = el("i", { class: "hz-cleaning-audit-barfill" });
       const counters = el("div", { class: "hz-cleaning-audit-counters" }, [
-        el("div", { class: "hz-cleaning-audit-counter" }, [el("span", { text: "rows in the file" }), rowsNum]),
-        el("div", { class: "hz-cleaning-audit-counter is-dirty" }, [el("span", { text: "dirty values left" }), dirtyNum, el("span", { class: "hz-cleaning-audit-bar" }, [bar])]),
+        el("div", { class: "hz-cleaning-audit-counter" }, [el("span", { text: "bookings in the file" }), rowsNum]),
+        el("div", { class: "hz-cleaning-audit-counter is-dirty" }, [el("span", { text: "problems left" }), dirtyNum, el("span", { class: "hz-cleaning-audit-bar" }, [bar])]),
       ]);
       const codeLine = el("pre", { class: "hz-cleaning-audit-code" });
 
@@ -120,10 +124,10 @@
 
       const sumBody = el("tbody");
       const sumTable = el("table", { class: "hz-cleaning-audit-sum" }, [
-        el("thead", {}, [el("tr", {}, [el("th", { text: "issue" }), el("th", { text: "decision" }), el("th", { text: "rows affected" })])]),
+        el("thead", {}, [el("tr", {}, [el("th", { text: "problem" }), el("th", { text: "decision" }), el("th", { text: "rows affected" })])]),
         sumBody,
       ]);
-      const sumWrap = el("div", { class: "hz-cleaning-audit-sumwrap" }, [el("p", { class: "hz-cleaning-audit-sumtitle", text: "Cleaning summary (this table is part of Advance 2)" }), sumTable]);
+      const sumWrap = el("div", { class: "hz-cleaning-audit-sumwrap" }, [el("p", { class: "hz-cleaning-audit-sumtitle", text: "Cleaning log (your case needs one too)" }), sumTable]);
 
       const note = el("p", { class: "hz-x__note", "aria-live": "polite" });
       body.append(controls, el("div", { class: "hz-cleaning-audit-top" }, [codeLine, counters]), list, sumWrap, note);
@@ -172,8 +176,8 @@
         playBtn.disabled = busy;
         stepBtn.disabled = busy || stage === STEPS.length;
         playBtn.textContent = stage === STEPS.length && !busy ? "Replay" : "Play";
-        codeLine.textContent = stage ? STEPS[stage - 1].code : "df = raw.copy()   # 5,075 rows, straight from the CSV";
-        note.replaceChildren(...(stage ? [el("b", { text: "Step " + stage + " · " + STEPS[stage - 1].name + ": " }), ...rich(STEPS[stage - 1].cap)] : ["The raw file: 925 dirty values hidden among 5,075 rows. Press Play, or Step through the pipeline in the order the notebook uses."]));
+        codeLine.textContent = stage ? STEPS[stage - 1].code : "raw = pd.read_csv(DATA + \"altamar_bookings.csv\")   # 6,060 bookings";
+        note.replaceChildren(...(stage ? [el("b", { text: "Step " + stage + " · " + STEPS[stage - 1].name + ": " }), ...rich(STEPS[stage - 1].cap)] : ["The raw file: 720 problems hidden among 6,060 bookings. Press Play, or Step through the pipeline in the order the notebook uses."]));
       }
 
       function renderStatic() {
@@ -204,7 +208,7 @@
         removed.forEach((i) => {
           rowEls[i].classList.add("is-removing");
           chipEls[i].tag.textContent = SAMPLE[i].why;
-          if (s === 5) chipEls[i].chips.bill.classList.add("is-active");
+          if (SAMPLE[i].bad) chipEls[i].chips[SAMPLE[i].bad].classList.add("is-active");
         });
         await HZ.wait(650);
         if (!alive()) return false;
@@ -303,7 +307,7 @@
 .md-typeset .hz-cleaning-audit-list { display: flex; flex-direction: column; }
 .md-typeset .hz-cleaning-audit-row {
   display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.3rem; padding: 0.3rem 0.35rem; border-top: 1px solid var(--hz-line);
-  max-height: 6em; overflow: hidden; border-radius: 6px;
+  max-height: 9em; overflow: hidden; border-radius: 6px;
   transition: max-height 520ms cubic-bezier(.65,0,.35,1), opacity 400ms ease, padding 520ms cubic-bezier(.65,0,.35,1), background-color 250ms ease;
 }
 .md-typeset .hz-cleaning-audit-row.is-dupe, .md-typeset .hz-cleaning-audit-row.is-removing { background: color-mix(in srgb, var(--hz-bad) 10%, transparent); }

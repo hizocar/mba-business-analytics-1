@@ -1,8 +1,7 @@
-/* Session 5: how a decision tree picks its question. Twenty Cordillera
-   customers along one feature; the split line cuts them in two groups,
-   each group gets a Gini impurity, and the tree keeps the split with the
-   lowest weighted Gini. A second feature shows why the real tree asks
-   about support tickets first. */
+/* Week 5: how a decision tree picks its question. Twenty Altamar bookings
+   along one feature; the split line cuts them in two groups, each group gets
+   a Gini impurity, and the tree keeps the split with the lowest weighted
+   Gini. A second feature shows why the real tree asks about lead time first. */
 (function () {
   const { el, svg, slider, button, segmented, scale, tween, wait, fmt, clamp } = HZ;
 
@@ -11,16 +10,18 @@
   const CURVE = { top: 212, bottom: 300 };
   const R = 7, GAP = 16;
 
-  // [tenure months, support tickets, churned]
+  // [lead time in days, special requests, cancelled]
   const CUSTOMERS = [
-    [1, 2, 1], [2, 0, 1], [3, 3, 1], [4, 1, 1], [5, 4, 1], [8, 3, 1], [16, 3, 1], [27, 4, 1],
-    [3, 0, 0], [6, 1, 0], [10, 0, 0], [12, 2, 0], [15, 1, 0], [19, 0, 0], [23, 1, 0], [28, 0, 0],
-    [33, 2, 0], [38, 0, 0], [44, 1, 0], [47, 2, 0],
-  ].map(([tenure, tickets, y]) => ({ v: [tenure, tickets], y }));
+    [48, 0, 1], [56, 1, 1], [64, 0, 1], [72, 2, 1], [84, 1, 1], [96, 0, 1], [112, 1, 1], [176, 0, 1], [224, 3, 1],
+    [0, 1, 0], [8, 0, 0], [16, 2, 0], [24, 0, 0], [32, 1, 0], [40, 0, 0], [104, 2, 0], [128, 3, 0], [144, 1, 0],
+    [160, 2, 0], [200, 1, 0],
+  ].map(([lead, requests, y]) => ({ v: [lead, requests], y }));
 
+  // A question is "feature ≤ t", with t halfway between two neighbouring values
+  // (as scikit-learn does), shown rounded down.
   const FEATURES = [
-    { key: 0, name: "tenure", label: "Tenure (months)", axis: "months as a customer", domain: [0, 48], ticks: [0, 6, 12, 24, 36, 48], unit: (t) => `${t} month${t === 1 ? "" : "s"}` },
-    { key: 1, name: "tickets", label: "Support tickets", axis: "support tickets in the last 6 months", domain: [-0.5, 4.5], ticks: [0, 1, 2, 3, 4], unit: (t) => `${t} ticket${t === 1 ? "" : "s"}` },
+    { key: 0, name: "lead time", label: "Lead time (days)", axis: "lead time: days between booking and arrival", domain: [-6, 236], ticks: [0, 30, 60, 90, 120, 150, 180, 210] },
+    { key: 1, name: "requests", label: "Special requests", axis: "special requests made with the booking", domain: [-0.5, 3.5], ticks: [0, 1, 2, 3] },
   ];
 
   const gini = (churn, n) => (n ? 1 - (churn / n) ** 2 - ((n - churn) / n) ** 2 : 0);
@@ -38,12 +39,14 @@
     return { L, R: Rt, w: (L.n * L.g + Rt.n * Rt.g) / n };
   }
 
-  // Candidate thresholds: "feature ≤ t" for every integer t that leaves someone on each side.
+  // Candidate thresholds: midpoints between neighbouring distinct values.
   function candidates(f) {
-    const vals = CUSTOMERS.map((c) => c.v[f]);
-    const lo = Math.min(...vals), hi = Math.max(...vals);
+    const vals = [...new Set(CUSTOMERS.map((c) => c.v[f]))].sort((a, b) => a - b);
     const out = [];
-    for (let t = lo; t < hi; t++) out.push({ t, ...splitAt(f, t) });
+    for (let i = 0; i < vals.length - 1; i++) {
+      const mid = (vals[i] + vals[i + 1]) / 2;
+      out.push({ i, mid, t: Math.floor(mid), ...splitAt(f, mid) });
+    }
     return out;
   }
 
@@ -56,11 +59,12 @@
     const winner = best[0].w <= best[1].w ? 0 : 1;
 
     let f = 0;
-    let t = 12;
+    let ci = 0; // index of the current candidate split
+    let t = 0;
     const seen = [new Set(), new Set()];
     let busy = 0;
 
-    const plot = svg("svg", { viewBox: `0 0 ${W} ${H}`, class: "hz-gini-plot", role: "img", "aria-label": "Customers along one feature, split by a movable line, with the weighted Gini of every split below" });
+    const plot = svg("svg", { viewBox: `0 0 ${W} ${H}`, class: "hz-gini-plot", role: "img", "aria-label": "Bookings along one feature, split by a movable line, with the weighted Gini of every split below" });
     const shadeL = svg("rect", { class: "hz-gini-shade is-left", y: STRIP.top - 22, height: STRIP.base - STRIP.top + 34 });
     const shadeR = svg("rect", { class: "hz-gini-shade is-right", y: STRIP.top - 22, height: STRIP.base - STRIP.top + 34 });
     const axisLayer = svg("g");
@@ -105,31 +109,31 @@
       ]);
       axisLayer.append(parentLine);
 
-      // dots: stack customers with the same value, stayers at the bottom
+      // dots: stack bookings with the same value, kept ones at the bottom
       const groups = {};
       CUSTOMERS.slice().sort((a, b) => a.y - b.y).forEach((c) => (groups[c.v[f]] = groups[c.v[f]] || []).push(c));
       Object.entries(groups).forEach(([v, list]) =>
         list.forEach((c, i) => {
           const d = svg("circle", { cx: xs(+v), cy: STRIP.base - i * GAP, r: R, class: "hz-gini-dot " + (c.y ? "is-churn" : "is-stay") });
-          d.append(svg("title", { text: `${c.y ? "churned" : "stayed"}: ${c.v[0]} months, ${c.v[1]} tickets` }));
+          d.append(svg("title", { text: `${c.y ? "cancelled" : "kept"}: booked ${c.v[0]} days ahead, ${c.v[1]} special request${c.v[1] === 1 ? "" : "s"}` }));
           dots.push({ c, d });
           dotLayer.append(d);
         })
       );
 
       cands[f].forEach((c) => {
-        const dot = svg("circle", { cx: xs(c.t + 0.5), cy: ys(c.w), r: 3.2, class: "hz-gini-cdot" + (seen[f].has(c.t) ? " is-seen" : "") });
+        const dot = svg("circle", { cx: xs(c.mid), cy: ys(c.w), r: 3.2, class: "hz-gini-cdot" + (seen[f].has(c.i) ? " is-seen" : "") });
         curveDots.push({ c, dot });
         curveLayer.append(dot);
       });
       const b = best[f];
-      bestMark = svg("g", { class: "hz-gini-best", transform: `translate(${xs(b.t + 0.5)},${ys(b.w)})` }, [
+      bestMark = svg("g", { class: "hz-gini-best", transform: `translate(${xs(b.mid)},${ys(b.w)})` }, [
         svg("circle", { r: 8 }),
         svg("text", { y: 22, "text-anchor": "middle", text: `best: ≤ ${b.t} · ${b.w.toFixed(2)}` }),
       ]);
       curveLayer.append(bestMark);
-      sT.input.min = cands[f][0].t;
-      sT.input.max = cands[f][cands[f].length - 1].t;
+      sT.input.min = 0;
+      sT.input.max = cands[f].length - 1;
     }
 
     // Group cards
@@ -155,16 +159,18 @@
       cd.title.textContent = rule;
       cd.mixC.style.width = (g.n ? (100 * g.churn) / g.n : 0) + "%";
       cd.mixS.style.width = (g.n ? (100 * (g.n - g.churn)) / g.n : 0) + "%";
-      cd.counts.textContent = `${g.n} customers: ${g.churn} churn, ${g.n - g.churn} stay`;
+      cd.counts.textContent = `${g.n} bookings: ${g.churn} cancelled, ${g.n - g.churn} kept`;
       cd.gFill.style.width = (100 * g.g) / 0.5 + "%";
       cd.gVal.textContent = g.g.toFixed(2);
     }
 
     function draw() {
       const F = FEATURES[f];
-      const s = splitAt(f, t);
-      const x = xs(t + 0.5);
-      seen[f].add(t);
+      const cur = cands[f][ci];
+      t = cur.t;
+      const s = splitAt(f, cur.mid);
+      const x = xs(cur.mid);
+      seen[f].add(ci);
       shadeL.setAttribute("x", M.l - 10);
       shadeL.setAttribute("width", Math.max(0, x - M.l + 10));
       shadeR.setAttribute("x", x);
@@ -172,16 +178,17 @@
       cut.setAttribute("x1", x);
       cut.setAttribute("x2", x);
       handle.setAttribute("transform", `translate(${x},${STRIP.top - 22})`);
-      handle.setAttribute("aria-valuenow", t);
+      handle.setAttribute("aria-valuenow", ci);
+      handle.setAttribute("aria-valuetext", `${F.name} ≤ ${t}`);
       handle.querySelector("text").textContent = `≤ ${t}`;
       labelL.setAttribute("x", M.l - 6);
-      labelL.textContent = x - M.l > 185 ? `≤ ${t}: ${s.L.churn} churn · ${s.L.n - s.L.churn} stay` : x - M.l > 125 ? `${s.L.churn} churn · ${s.L.n - s.L.churn} stay` : "";
+      labelL.textContent = x - M.l > 205 ? `≤ ${t}: ${s.L.churn} cancel · ${s.L.n - s.L.churn} keep` : x - M.l > 140 ? `${s.L.churn} cancel · ${s.L.n - s.L.churn} keep` : "";
       labelR.setAttribute("x", W - M.r + 6);
-      labelR.textContent = W - M.r - x > 185 ? `> ${t}: ${s.R.churn} churn · ${s.R.n - s.R.churn} stay` : W - M.r - x > 125 ? `${s.R.churn} churn · ${s.R.n - s.R.churn} stay` : "";
-      dots.forEach(({ c, d }) => d.classList.toggle("is-right", c.v[f] > t));
+      labelR.textContent = W - M.r - x > 205 ? `> ${t}: ${s.R.churn} cancel · ${s.R.n - s.R.churn} keep` : W - M.r - x > 140 ? `${s.R.churn} cancel · ${s.R.n - s.R.churn} keep` : "";
+      dots.forEach(({ c, d }) => d.classList.toggle("is-right", c.v[f] > cur.mid));
       curveDots.forEach(({ c, dot }) => {
-        dot.classList.toggle("is-seen", seen[f].has(c.t));
-        dot.classList.toggle("is-now", c.t === t);
+        dot.classList.toggle("is-seen", seen[f].has(c.i));
+        dot.classList.toggle("is-now", c.i === ci);
       });
       const allSeen = seen[f].size >= cands[f].length;
       bestMark.classList.toggle("is-on", allSeen);
@@ -194,47 +201,48 @@
 
       const isBest = Math.abs(s.w - best[f].w) < 1e-9;
       const other = best[1 - f];
+      const nm = (k) => FEATURES[k].name;
       if (isBest && allSeen) {
         note.innerHTML = f === winner
-          ? `The best question on ${F.name}: <strong>${F.name} ≤ ${t}</strong>, weighted Gini ${s.w.toFixed(3)}. ${f === 1 ? `It beats the best tenure split (${best[0].w.toFixed(3)}), so the tree asks about <strong>support tickets first</strong>, just like the real tree on Cordillera's data.` : "Switch to the other feature: is there an even better question?"}`
-          : `The best question on ${F.name} gives ${s.w.toFixed(3)}, but ${FEATURES[1 - f].name} ≤ ${other.t} gives ${other.w.toFixed(3)}. The tree compares the best split of <strong>every</strong> feature and keeps the lowest: ${FEATURES[winner].name}.`;
+          ? `The best question on ${nm(f)}: <strong>${nm(f)} ≤ ${t}</strong>, weighted Gini ${s.w.toFixed(3)}. It beats the best question on special requests (${other.w.toFixed(3)}), so the tree asks about <strong>lead time first</strong>, like the real tree on Altamar's 4,473 training bookings (lead time ≤ 45.5 days). The right side is still mixed: risk peaks around three months out, so the tree will need another question there.`
+          : `The best question on ${nm(f)} gives ${s.w.toFixed(3)}, barely below the ${parentG.toFixed(3)} we started with, but ${nm(1 - f)} ≤ ${other.t} gives ${other.w.toFixed(3)}. The tree compares the best split of <strong>every</strong> feature and keeps the lowest: ${nm(winner)}.`;
       } else if (s.L.g === 0 || s.R.g === 0) {
-        note.innerHTML = `One side is <strong>pure</strong> (Gini 0: everyone in it made the same choice). But a pure side is not enough: the weighted Gini also counts how mixed the other, ${s.L.g === 0 ? "right" : "left"} side is.`;
+        note.innerHTML = `One side is <strong>pure</strong> (Gini 0: every booking in it ended the same way). But a pure side is not enough: the weighted Gini also counts how mixed the other, ${s.L.g === 0 ? "right" : "left"} side is.`;
       } else if (!allSeen) {
-        note.innerHTML = `Gini = 1 − p<sub>churn</sub>² − p<sub>stay</sub>²: 0 for a pure group, 0.5 for a 50/50 mix. Each dot below is one split you have tried. You have tried <strong>${seen[f].size} of ${cands[f].length}</strong>; press "Try every split" to let the tree try them all.`;
+        note.innerHTML = `Gini = 1 − p<sub>cancel</sub>² − p<sub>keep</sub>²: 0 for a pure group, 0.5 for a 50/50 mix. Each dot below is one split you have tried. You have tried <strong>${seen[f].size} of ${cands[f].length}</strong>; press "Try every split" to let the tree try them all.`;
       } else {
-        note.innerHTML = `Every split has been tried. The tree keeps the lowest dot: <strong>${F.name} ≤ ${best[f].t}</strong> (ringed). Big groups weigh more: a split that isolates one customer barely lowers the weighted Gini.`;
+        note.innerHTML = `Every split has been tried. The tree keeps the lowest dot: <strong>${nm(f)} ≤ ${best[f].t}</strong> (ringed). Big groups weigh more: a split that isolates one booking barely lowers the weighted Gini.`;
       }
     }
 
     function setT(v) {
-      t = clamp(Math.round(v), cands[f][0].t, cands[f][cands[f].length - 1].t);
-      sT.set(t);
+      ci = clamp(Math.round(v), 0, cands[f].length - 1);
+      sT.set(ci);
       draw();
     }
 
-    const sT = slider({ label: "Split at ≤", min: 0, max: 46, step: 1, value: t, oninput: (v) => { busy++; setT(v); } });
+    const sT = slider({ label: "Split at ≤", min: 0, max: 18, step: 1, value: 0, format: (v) => (cands[f][v] ? "≤ " + cands[f][v].t : ""), oninput: (v) => { busy++; setT(v); } });
 
     async function sweep() {
       const id = ++busy;
       sweepBtn.disabled = true;
       const list = cands[f];
-      const ms = f === 0 ? 1800 : 1100;
+      const ms = f === 0 ? 1800 : 700;
       let last = -1;
       await tween(body, ms, (k) => {
         if (id !== busy) return;
         const i = Math.min(list.length - 1, Math.floor(k * list.length));
         if (i !== last) {
-          for (let j = last + 1; j <= i; j++) seen[f].add(list[j].t);
+          for (let j = last + 1; j <= i; j++) seen[f].add(j);
           last = i;
-          setT(list[i].t);
+          setT(i);
         }
       }, (k) => k);
       if (id !== busy || !body.isConnected) return (sweepBtn.disabled = false);
-      list.forEach((c) => seen[f].add(c.t));
+      list.forEach((c) => seen[f].add(c.i));
       await wait(250);
       if (id !== busy) return (sweepBtn.disabled = false);
-      const from = t, to = best[f].t;
+      const from = ci, to = best[f].i;
       await tween(body, 500, (k) => id === busy && setT(from + (to - from) * k));
       sweepBtn.disabled = false;
     }
@@ -245,15 +253,17 @@
       sweepBtn.disabled = false;
       f = +v;
       buildFeature();
-      t = f === 0 ? 12 : 0;
-      setT(t);
+      setT(f === 0 ? 1 : 0);
     });
 
     // Drag the line (pointer anywhere on the strip with a mouse; the handle on touch).
     let dragging = false;
     const toT = (e) => {
       const r = plot.getBoundingClientRect();
-      return xs.invert(((e.clientX - r.left) / r.width) * W) - 0.5;
+      const v = xs.invert(((e.clientX - r.left) / r.width) * W);
+      let k = 0;
+      cands[f].forEach((c, i) => Math.abs(c.mid - v) < Math.abs(cands[f][k].mid - v) && (k = i));
+      return k;
     };
     plot.addEventListener("pointerdown", (e) => {
       if (e.pointerType !== "mouse" && !handle.contains(e.target)) return;
@@ -269,16 +279,16 @@
       if (!step) return;
       e.preventDefault();
       busy++;
-      setT(t + step);
+      setT(ci + step);
     });
 
     body.append(
-      el("p", { class: "hz-x__lede", html: "Twenty Cordillera customers, placed by one feature. A tree's question is a line: everyone on the left goes one way, everyone on the right the other. Drag the line and watch how <strong>mixed</strong> each side stays." }),
+      el("p", { class: "hz-x__lede", html: "Twenty Altamar bookings, placed by one feature. A tree's question is a line: every booking on the left goes one way, every booking on the right the other. Drag the line and watch how <strong>mixed</strong> each side stays." }),
       el("div", { class: "hz-x__controls" }, [featSeg.node]),
       plot,
       el("div", { class: "hz-legend" }, [
-        el("span", {}, [el("i", { style: "background: var(--hz-a)" }), "churned"]),
-        el("span", {}, [el("i", { style: "background: var(--hz-b)" }), "stayed"]),
+        el("span", {}, [el("i", { style: "background: var(--hz-a)" }), "cancelled"]),
+        el("span", {}, [el("i", { style: "background: var(--hz-b)" }), "kept"]),
         el("span", {}, [el("i", { style: "background: var(--hz-ink); opacity: 0.55; transform: scale(0.6)" }), "weighted Gini of a split you tried (lower is better)"]),
       ]),
       el("div", { class: "hz-gini-cards" }, [cardL.node, cardR.node]),
@@ -287,11 +297,11 @@
       note
     );
     buildFeature();
-    setT(t);
+    setT(1);
   }
 
   HZ.register("gini", {
-    kicker: "Session 5",
+    kicker: "Week 5",
     title: "Choosing a question with Gini impurity",
     mount,
     css: `

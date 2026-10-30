@@ -1,19 +1,22 @@
 /*
- * kfold: k-fold cross-validation on the training data only.
+ * kfold (Week 5): k-fold cross-validation on Altamar's training bookings.
  * Each iteration moves the validation fold one step to the right, scores it,
- * and drops the score into a dot plot; the end shows mean ± std.
+ * and drops the score into a dot plot; the end shows mean ± std. The scores
+ * are real: scikit-learn's cross_val_score on altamar_bookings_clean.csv for a
+ * depth-6 tree on the rate (R²) and a depth-4 tree on cancellations (AUC).
  */
 (function () {
   const { el, svg } = HZ;
 
-  const N_ROWS = 545; // Housing dataset used in the notebook
-  const N_TEST = Math.ceil(N_ROWS * 0.3), N_TRAIN = N_ROWS - N_TEST;
-  const DOMAIN = [0.55, 0.85];
-
-  function scoresFor(k) {
-    const r = HZ.rng(700 + k * 13);
-    return Array.from({ length: k }, () => Math.round(HZ.clamp(0.7 + 0.035 * r.normal(), 0.57, 0.83) * 1000) / 1000);
-  }
+  const N_ROWS = 5964; // clean Altamar bookings
+  const N_TEST = 1491, N_TRAIN = N_ROWS - N_TEST; // test_size=0.25
+  const SCORES = {"rate":{"3":[0.783,0.846,0.818],"4":[0.836,0.827,0.831,0.821],"5":[0.831,0.823,0.846,0.817,0.818],"6":[0.823,0.812,0.858,0.828,0.806,0.827],"7":[0.832,0.818,0.846,0.846,0.822,0.82,0.821],"8":[0.829,0.828,0.812,0.864,0.838,0.802,0.818,0.82],"9":[0.848,0.827,0.811,0.868,0.843,0.814,0.815,0.805,0.816],"10":[0.824,0.832,0.849,0.824,0.857,0.831,0.815,0.813,0.826,0.82]},"cancel":{"3":[0.764,0.765,0.783],"4":[0.779,0.771,0.752,0.787],"5":[0.771,0.79,0.784,0.771,0.785],"6":[0.783,0.765,0.779,0.76,0.78,0.789],"7":[0.787,0.767,0.78,0.775,0.755,0.812,0.767],"8":[0.795,0.761,0.754,0.777,0.756,0.757,0.813,0.759],"9":[0.799,0.764,0.759,0.791,0.779,0.758,0.791,0.795,0.763],"10":[0.795,0.752,0.778,0.785,0.763,0.772,0.757,0.779,0.814,0.76]}};
+  const Q = {
+    rate: { metric: "R²", label: "Nightly rate · R²", model: "a depth-6 tree for the nightly rate", domain: [0.77, 0.88], ticks: [0.78, 0.8, 0.82, 0.84, 0.86] },
+    cancel: { metric: "AUC", label: "Cancellations · AUC", model: "a depth-4 tree for cancellations", domain: [0.74, 0.83], ticks: [0.74, 0.76, 0.78, 0.8, 0.82] },
+  };
+  let q = "rate";
+  const scoresFor = (k) => SCORES[q][k];
   const mean = (xs) => xs.reduce((a, b) => a + b, 0) / xs.length;
   const std = (xs) => Math.sqrt(mean(xs.map((x) => (x - mean(xs)) ** 2)));
   // KFold: the first n % k folds get one extra row
@@ -22,7 +25,9 @@
 
   HZ.register("kfold", {
     title: "k-fold cross-validation",
-    kicker: "Session 3",
+    css: `.md-typeset .hz-x svg .hz-kfold-lab, .md-typeset .hz-x svg .hz-kfold-in, .md-typeset .hz-x svg .hz-kfold-fold, .md-typeset .hz-x svg .hz-kfold-tick, .md-typeset .hz-x svg .hz-kfold-score { font-size: 12px; }
+.md-typeset .hz-x svg .hz-kfold-meantext { font-size: 12.5px; }`,
+    kicker: "Week 5",
     mount(body) {
       body.classList.add("hz-kfold");
       const uid = Math.random().toString(36).slice(2, 8);
@@ -30,19 +35,21 @@
       let scores = scoresFor(k);
 
       body.append(el("p", { class: "hz-x__lede" }, [
-        "One train/validation split can be lucky or unlucky. Cross-validation rotates the validation fold so every training row is used for validation exactly once, then averages the ",
+        "One test is one opinion: a single split can be lucky or unlucky. Cross-validation cuts the training bookings into ",
         el("code", { text: "k" }),
-        " scores.",
+        " folds, lets each fold be the validation set once, and averages the k scores.",
       ]));
 
       const kSlider = HZ.slider({ label: "Folds k", min: 3, max: 10, step: 1, value: k, oninput: (v) => { k = v; scores = scoresFor(k); hardReset(); } });
       const testBox = el("input", { type: "checkbox", checked: true, id: "hz-kf-test-" + uid });
       testBox.addEventListener("change", () => { withTest = testBox.checked; rebuild(); });
-      const testLabel = el("label", { class: "hz-kfold-toggle", for: testBox.id }, [testBox, "Hold out a test set (30%)"]);
+      const testLabel = el("label", { class: "hz-kfold-toggle", for: testBox.id }, [testBox, "Hold out a test set (25%)"]);
+      const qSeg = HZ.segmented([{ value: "rate", label: Q.rate.label }, { value: "cancel", label: Q.cancel.label }], q, (v) => { q = v; scores = scoresFor(k); hardReset(); });
       const playBtn = HZ.button("Play", () => play(), "primary");
       const stepBtn = HZ.button("Step", () => step());
       const resetBtn = HZ.button("Reset", () => hardReset());
       body.append(
+        el("div", { class: "hz-x__controls" }, [qSeg.node]),
         el("div", { class: "hz-x__controls" }, [kSlider.node, testLabel]),
         el("div", { class: "hz-x__controls hz-kfold-btns" }, [playBtn, stepBtn, resetBtn])
       );
@@ -62,7 +69,7 @@
         w = Math.max(280, w);
         const labelW = w < 420 ? 40 : 54, scoreW = w < 420 ? 50 : 72;
         const barX = labelW, barW = w - labelW - scoreW;
-        const testW = withTest ? Math.round(barW * 0.3) : 0;
+        const testW = withTest ? Math.round(barW * 0.25) : 0;
         const tGap = withTest ? 8 : 0;
         const trainW = barW - testW - tGap;
         const bGap = k > 7 ? 2 : 3;
@@ -75,7 +82,7 @@
         return {
           w, h: axisY + 22, labelW, scoreW, barX, barW, trainW, testW, testX: barX + trainW + tGap,
           bGap, blockW, dataY, dataH, foldY, rowY0, rowH, pitch, plotY, axisY,
-          sx: HZ.scale(DOMAIN, [barX, barX + barW]),
+          sx: HZ.scale(Q[q].domain, [barX, barX + barW]),
         };
       }
       const blockX = (j) => L.barX + j * (L.blockW + L.bGap);
@@ -100,11 +107,11 @@
         fig.append(svg("rect", { x: L.barX, y: L.dataY, width: L.trainW, height: L.dataH, rx: 5, class: "hz-kfold-train-all" }));
         fig.append(svg("text", {
           x: L.barX + 8, y: L.dataY + L.dataH / 2 + 4, class: "hz-kfold-in",
-          text: (withTest ? "training" : "all rows") + " · " + (withTest ? N_TRAIN : N_ROWS) + (L.trainW > 170 ? " rows" : ""),
+          text: (withTest ? "training" : "all bookings") + " · " + (withTest ? N_TRAIN : N_ROWS).toLocaleString("en-US"),
         }));
         if (withTest) {
           fig.append(svg("rect", { x: L.testX, y: L.dataY, width: L.testW, height: L.dataH, rx: 5, class: "hz-kfold-test", style: hatch }));
-          fig.append(svg("text", { x: L.testX + L.testW / 2, y: L.dataY + L.dataH / 2 + 4, "text-anchor": "middle", class: "hz-kfold-in", text: "test · " + N_TEST }));
+          fig.append(svg("text", { x: L.testX + L.testW / 2, y: L.dataY + L.dataH / 2 + 4, "text-anchor": "middle", class: "hz-kfold-in", text: L.testW > 80 ? "test · " + N_TEST.toLocaleString("en-US") : "test" }));
         }
         // Bracket: the training part is cut into k folds
         const by = L.dataY + L.dataH + 6;
@@ -114,7 +121,7 @@
         }));
         if (L.blockW >= 16)
           for (let j = 0; j < k; j++)
-            fig.append(svg("text", { x: blockX(j) + L.blockW / 2, y: L.foldY, "text-anchor": "middle", class: "hz-kfold-fold", text: (L.blockW >= 30 ? "fold " : "") + (j + 1) }));
+            fig.append(svg("text", { x: blockX(j) + L.blockW / 2, y: L.foldY, "text-anchor": "middle", class: "hz-kfold-fold", text: (L.blockW >= 56 ? "fold " : "") + (j + 1) }));
 
         rowBg = svg("rect", { x: -4, width: L.w + 8, height: L.pitch, rx: 6, class: "hz-kfold-rowbg", opacity: 0 });
         fig.append(rowBg);
@@ -131,7 +138,7 @@
             g.append(b);
           }
           if (withTest) g.append(svg("rect", { x: L.testX, y, width: L.testW, height: L.rowH, rx: 3, class: "hz-kfold-test is-row", style: hatch }));
-          const st = svg("text", { x: L.w, y: y + L.rowH / 2 + 4, "text-anchor": "end", class: "hz-kfold-score", opacity: 0, text: (L.scoreW > 60 ? "R² " : "") + scores[i].toFixed(3) });
+          const st = svg("text", { x: L.w, y: y + L.rowH / 2 + 4, "text-anchor": "end", class: "hz-kfold-score", opacity: 0, text: (L.scoreW > 60 ? Q[q].metric + " " : "") + scores[i].toFixed(3) });
           g.append(st);
           scoreTexts.push(st);
           rows.push({ g, blocks });
@@ -139,13 +146,13 @@
         }
 
         // Dot plot
-        const ticks = [0.6, 0.65, 0.7, 0.75, 0.8];
-        fig.append(svg("text", { x: 0, y: L.axisY + 4, class: "hz-kfold-lab", text: L.labelW > 45 ? "val R²" : "R²" }));
+        const ticks = Q[q].ticks;
+        fig.append(svg("text", { x: 0, y: L.axisY + 4, class: "hz-kfold-lab", text: L.labelW > 45 ? "val " + Q[q].metric : Q[q].metric }));
         fig.append(svg("line", { x1: L.barX, x2: L.barX + L.barW, y1: L.axisY, y2: L.axisY, class: "hz-axis" }));
         ticks.forEach((t) => {
           const x = L.sx(t);
           fig.append(svg("line", { x1: x, x2: x, y1: L.plotY, y2: L.axisY, class: "hz-gridline" }));
-          fig.append(svg("text", { x, y: L.axisY + 14, "text-anchor": "middle", class: "hz-kfold-tick", text: t.toFixed(2) }));
+          if (L.barW > 300 || ticks.indexOf(t) % 2 === 0) fig.append(svg("text", { x, y: L.axisY + 14, "text-anchor": "middle", class: "hz-kfold-tick", text: t.toFixed(2) }));
         });
         band = svg("rect", { y: L.plotY + 2, height: L.axisY - L.plotY - 4, rx: 3, class: "hz-kfold-band", opacity: 0 });
         meanLine = svg("line", { y1: L.plotY, y2: L.axisY, class: "hz-kfold-mean", opacity: 0 });
@@ -201,23 +208,23 @@
         if (summary) {
           const m = mean(scores), s = std(scores);
           return [
-            "Every fold was the validation set exactly once. Cross-validated R² = ",
+            "Every fold was the validation set exactly once. Cross-validated ", Q[q].metric, " for ", Q[q].model, " = ",
             el("b", { text: m.toFixed(3) + " ± " + s.toFixed(3) }),
-            " (mean ± std of the ", k, " scores): a steadier estimate than any single split, and the spread shows how much it depends on luck. ",
-            withTest ? "Use it to compare models; score the final model on the test set only once, at the very end." : "But with no test set held out, there is no untouched data left for an honest final check.",
+            " (mean ± std of the ", k, " scores): a steadier estimate than any single split, and the spread shows how much one score depends on luck. ",
+            withTest ? "Use it to compare depths; score the chosen tree on the test set only once, at the very end." : "But with no test set held out, there is no untouched data left for an honest final check.",
           ];
         }
         if (done === 0)
           return withTest
-            ? ["The ", N_TEST, " test rows are locked away first. The ", N_TRAIN, " training rows are shuffled and cut into k = ", k, " folds of about ", approx, " rows. Press Play or Step."]
-            : ["All ", N_ROWS, " rows are cut into k = ", k, " folds of about ", approx, " rows. Nothing is held out for a final test. Press Play or Step."];
+            ? ["The ", N_TEST.toLocaleString("en-US"), " test bookings are locked away first. The ", N_TRAIN.toLocaleString("en-US"), " training bookings are shuffled and cut into k = ", k, " folds of about ", approx, ". Press Play or Step."]
+            : ["All ", N_ROWS.toLocaleString("en-US"), " bookings are cut into k = ", k, " folds of about ", approx, ". Nothing is held out for a final test. Press Play or Step."];
         const i = done - 1;
         const others = [];
         for (let j = 0; j < k; j++) if (j !== i) others.push(j + 1);
         const valN = foldSize(n, k, i);
         return [
           el("b", { text: "Iteration " + done + " of " + k + ": " }),
-          "fit on folds ", listWords(others), " (", n - valN, " rows), then score on fold ", i + 1, " (", valN, " rows the model has not seen). Validation R² = ",
+          "fit on folds ", listWords(others), " (", n - valN, " bookings), then score on fold ", i + 1, " (", valN, " bookings the tree has not seen). Validation ", Q[q].metric, " = ",
           c(scores[i].toFixed(3)), ".",
           withTest ? " The test set is not used." : "",
         ];

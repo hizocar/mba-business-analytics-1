@@ -1,25 +1,27 @@
 /*
  * mask-filter: a condition becomes a True/False column (the mask), two masks
  * combine row by row with & or |, and df[mask] keeps only the True rows:
- * the False rows collapse away.
+ * the False rows collapse away. Eight real Altamar bookings.
  */
 (function () {
   const { el } = HZ;
 
+  // [hotel, lead_time_days] of eight bookings from altamar_bookings_clean.csv
   const ROWS = [
-    ["12 months", 2],
-    ["Month-to-month", 0],
-    ["Month-to-month", 4],
-    ["24 months", 3],
-    ["Month-to-month", 1],
-    ["12 months", 0],
-    ["Month-to-month", 3],
-    ["24 months", 1],
+    ["Viña del Mar", 92],
+    ["Santiago", 5],
+    ["Viña del Mar", 13],
+    ["Viña del Mar", 104],
+    ["Santiago", 135],
+    ["Puerto Varas", 41],
+    ["Puerto Varas", 116],
+    ["Viña del Mar", 4],
   ];
-  const A = ROWS.map(([c]) => c === "Month-to-month");
-  const B = ROWS.map(([, t]) => t >= 3);
-  const EXPR_A = 'df.contract == "Month-to-month"';
-  const EXPR_B = "df.support_tickets >= 3";
+  const HOTEL = "Viña del Mar";
+  const A = ROWS.map(([h]) => h === HOTEL);
+  const B = ROWS.map(([, t]) => t >= 90);
+  const EXPR_A = 'df.hotel == "Viña del Mar"';
+  const EXPR_B = "df.lead_time_days >= 90";
 
   const MODES = {
     A: { label: "A", cols: ["A"], expr: EXPR_A, mask: A },
@@ -29,7 +31,7 @@
   };
 
   HZ.register("mask-filter", {
-    kicker: "Session 2",
+    kicker: "Week 2",
     title: "A mask of True and False",
     mount(body) {
       body.classList.add("hz-mask-filter");
@@ -40,7 +42,7 @@
       const c = (s) => el("code", { text: s });
 
       body.append(el("p", { class: "hz-x__lede" }, [
-        "The retention team asks for month-to-month customers with 3 or more support tickets. Each condition turns into a column of True/False, one per customer; ",
+        "The revenue manager asks for Viña del Mar bookings made 90 or more days ahead: the early planners at the beach. Each condition turns into a column of True/False, one per booking; ",
         c("df[mask]"), " keeps the True rows.",
       ]));
 
@@ -59,7 +61,7 @@
       const controls = el("div", { class: "hz-x__controls" }, [seg.node, el("div", { class: "hz-mask-filter-btns" }, [playBtn, resetBtn])]);
 
       const codeLine = el("pre", { class: "hz-mask-filter-code" });
-      const grid = el("div", { class: "hz-mask-filter-grid", role: "table", "aria-label": "Eight customers with their masks" });
+      const grid = el("div", { class: "hz-mask-filter-grid", role: "table", "aria-label": "Eight bookings with their masks" });
       const count = el("p", { class: "hz-mask-filter-count", "aria-live": "polite" });
       const note = el("p", { class: "hz-x__note", "aria-live": "polite" });
       body.append(legend, controls, codeLine, el("div", { class: "hz-mask-filter-wrap" }, [grid]), count, note);
@@ -72,12 +74,12 @@
         grid.dataset.mode = mode;
         const head = el("div", { class: "hz-mask-filter-row is-head", role: "row" }, [
           el("span", { role: "columnheader", "aria-label": "index" }),
-          el("span", { role: "columnheader", text: "contract" }),
-          el("span", { role: "columnheader", html: "support_<wbr>tickets" }),
+          el("span", { role: "columnheader", text: "hotel" }),
+          el("span", { role: "columnheader", html: "lead_time_<wbr>days" }),
           ...m.cols.map((name, k) => el("span", { role: "columnheader", class: "hz-mask-filter-mh" + (k === 2 ? " is-result" : ""), text: name })),
         ]);
         badgeCols = m.cols.map(() => []);
-        rowEls = ROWS.map(([contract, t], i) => {
+        rowEls = ROWS.map(([hotel, t], i) => {
           const masks = m.cols.length === 1 ? [m.mask] : [A, B, m.mask];
           const badges = masks.map((mk, k) => {
             const b = el("span", { class: "hz-mask-filter-badge is-hidden " + (mk[i] ? "is-true" : "is-false") + (k === 2 ? " is-result" : ""), text: mk[i] ? "True" : "False" });
@@ -86,7 +88,7 @@
           });
           return el("div", { class: "hz-mask-filter-row", role: "row" }, [
             el("span", { role: "cell", class: "hz-mask-filter-idx", text: String(i) }),
-            el("span", { role: "cell", class: "hz-mask-filter-contract" + (contract === "Month-to-month" ? " is-m2m" : ""), text: contract }),
+            el("span", { role: "cell", class: "hz-mask-filter-contract" + (hotel === HOTEL ? " is-m2m" : ""), text: hotel }),
             el("span", { role: "cell", class: "hz-mask-filter-t", text: String(t) }),
             ...badges,
           ]);
@@ -98,16 +100,16 @@
       function caption() {
         const m = MODES[mode];
         const n = m.mask.filter(Boolean).length;
-        if (stage === 0) return ["Eight customers. Press Play: pandas checks the condition on every row at once, no loop needed."];
+        if (stage === 0) return ["Eight bookings. Press Play: pandas checks the condition on every row at once, no loop needed. Switch between A, B, A & B and A | B to compare."];
         if (stage === 1) {
           if (mode === "A" || mode === "B")
-            return [el("b", { text: "The mask: " }), "one True/False per customer, same index as ", c("df"), ". ", c(m.mask.filter(Boolean).length + " True"), " so far; nothing is removed yet."];
+            return [el("b", { text: "The mask: " }), "one True/False per booking, same index as ", c("df"), ". ", c(m.mask.filter(Boolean).length + " True"), " so far; nothing is removed yet."];
           if (mode === "and")
             return [el("b", { text: "& means AND: " }), "a row is True only when A ", el("em", { text: "and" }), " B are both True. Each condition needs its own parentheses."];
           return [el("b", { text: "| means OR: " }), "a row is True when A ", el("em", { text: "or" }), " B (or both) is True. OR always keeps at least as many rows as either condition alone."];
         }
-        if (mode === "and") return [el("b", { text: "Filtered: " }), "the False rows are gone. ", n, " of 8 customers are month-to-month ", el("em", { text: "and" }), " have 3+ tickets: the retention team's call list. Note the index keeps the original labels."];
-        if (mode === "or") return [el("b", { text: "Filtered: " }), n, " of 8 customers meet at least one condition. Too broad for a call list, but the right tool for “either risk”."];
+        if (mode === "and") return [el("b", { text: "Filtered: " }), "the False rows are gone. ", n, " of 8 bookings are at Viña del Mar ", el("em", { text: "and" }), " were made 90+ days ahead: exactly what the revenue manager asked for. The index keeps the original labels."];
+        if (mode === "or") return [el("b", { text: "Filtered: " }), n, " of 8 bookings meet at least one condition: every Viña booking plus every early booking anywhere. Much broader than the request. OR is the right tool for “either one”."];
         return [el("b", { text: "Filtered: " }), c("df[mask]"), " keeps the ", n, " True rows of 8. The index keeps the original labels, so you can trace every row back."];
       }
 

@@ -1,62 +1,64 @@
 /*
- * loc-iloc: the same six customers addressed by label (loc) and by position
- * (iloc). The index is customer IDs, not 0..n, so the two visibly differ:
- * the axis that is read lights up first, then the selected cells, then the
- * stop of a slice is marked as included (loc) or excluded (iloc).
+ * loc-iloc: the same six Altamar bookings addressed by label (loc) and by
+ * position (iloc). The index is booking IDs, not 0..n, so the two visibly
+ * differ: the axis that is read lights up first, then the selected cells,
+ * then the stop of a slice is marked as included (loc) or excluded (iloc).
  */
 (function () {
   const { el } = HZ;
 
-  const IDS = ["CM-12254", "CM-10004", "CM-10861", "CM-11339", "CM-13440", "CM-10173"];
-  const COLS = ["plan", "age", "monthly_bill", "churned"];
+  // The first six rows of altamar_bookings.csv, with booking_id as the index
+  const IDS = ["AH-200974", "AH-204908", "AH-202738", "AH-205156", "AH-200450", "AH-200967"];
+  const COLS = ["hotel", "nights", "adr", "canceled"];
   const ROWS = [
-    ["Basic", "34", "25.46", "0"],
-    ["Basic", "57", "37.26", "0"],
-    ["Plus", "51", "41.37", "0"],
-    ["Prepaid", "38", "11.43", "0"],
-    ["Unlimited", "31", "40.97", "0"],
-    ["Plus", "31", "37.05", "1"],
+    ["Viña del Mar", "3", "202.58", "1"],
+    ["Santiago", "2", "115.22", "1"],
+    ["Viña del Mar", "5", "68.57", "0"],
+    ["Viña del Mar", "6", "133.13", "0"],
+    ["Puerto Varas", "3", "113.35", "0"],
+    ["Santiago", "2", "139.19", "1"],
   ];
   const ALL = [0, 1, 2, 3];
+  const MASK_VALUE = "Santiago";
 
   // Outputs exactly as pandas prints them
   const PRESETS = [
     {
-      code: 'df.loc["CM-10004", "plan"]', mode: "loc", rows: [1], cols: [0], out: "'Basic'",
-      cap: (c) => [el("b", { text: "loc reads labels. " }), "Row label ", c("CM-10004"), ", column label ", c("plan"), ". One label on each axis gives back one value."],
+      code: 'df.loc["AH-204908", "hotel"]', mode: "loc", rows: [1], cols: [0], out: "'Santiago'",
+      cap: (c) => [el("b", { text: "loc reads labels. " }), "Row label ", c("AH-204908"), ", column label ", c("hotel"), ". One label on each axis gives back one value."],
     },
     {
-      code: "df.iloc[1, 0]", mode: "iloc", rows: [1], cols: [0], out: "'Basic'",
-      cap: (c) => [el("b", { text: "iloc counts positions from 0. " }), "Row position 1, column position 0: the same cell as ", c('df.loc["CM-10004", "plan"]'), ", written with a different address."],
+      code: "df.iloc[1, 0]", mode: "iloc", rows: [1], cols: [0], out: "'Santiago'",
+      cap: (c) => [el("b", { text: "iloc counts positions from 0. " }), "Row position 1, column position 0: the same cell as ", c('df.loc["AH-204908", "hotel"]'), ", written with a different address."],
     },
     {
       code: "df.iloc[0:3, 1:3]", mode: "iloc", rows: [0, 1, 2], cols: [1, 2], rowStop: 3, colStop: 3, incl: false,
-      out: "             age  monthly_bill\ncustomer_id                   \nCM-12254      34         25.46\nCM-10004      57         37.26\nCM-10861      51         41.37",
-      cap: (c) => [el("b", { text: "iloc slices exclude the stop, " }), "like Python lists: ", c("0:3"), " is positions 0, 1, 2. Row 3 (", c("CM-11339"), ") and column 3 (", c("churned"), ") are where it stops, so they are left out."],
+      out: "            nights     adr\nbooking_id                \nAH-200974        3  202.58\nAH-204908        2  115.22\nAH-202738        5   68.57",
+      cap: (c) => [el("b", { text: "iloc slices exclude the stop, " }), "like counting fence posts: ", c("0:3"), " is positions 0, 1, 2. Row 3 (", c("AH-205156"), ") and column 3 (", c("canceled"), ") are where it stops, so they are left out."],
     },
     {
-      code: 'df.loc["CM-12254":"CM-10861", "plan":"age"]', mode: "loc", rows: [0, 1, 2], cols: [0, 1], rowStop: 2, colStop: 1, incl: true,
-      out: "              plan  age\ncustomer_id            \nCM-12254     Basic   34\nCM-10004     Basic   57\nCM-10861      Plus   51",
-      cap: (c) => [el("b", { text: "loc slices include the stop. " }), c("CM-10861"), " and ", c("age"), " are in the result. Labels have no “one before”, so pandas keeps both ends."],
+      code: 'df.loc["AH-200974":"AH-202738", "hotel":"nights"]', mode: "loc", rows: [0, 1, 2], cols: [0, 1], rowStop: 2, colStop: 1, incl: true,
+      out: "                   hotel  nights\nbooking_id                      \nAH-200974   Viña del Mar       3\nAH-204908       Santiago       2\nAH-202738   Viña del Mar       5",
+      cap: (c) => [el("b", { text: "loc slices include the stop. " }), c("AH-202738"), " and ", c("nights"), " are in the result. Labels have no “one before”, so pandas keeps both ends."],
     },
     {
-      code: 'df.loc[df.plan == "Plus", ["plan", "monthly_bill"]]', mode: "loc", rows: [2, 5], cols: [0, 2], mask: true,
-      out: "             plan  monthly_bill\ncustomer_id                    \nCM-10861     Plus         41.37\nCM-10173     Plus         37.05",
-      cap: (c) => [el("b", { text: "A condition picks the rows. " }), c('df.plan == "Plus"'), " gives one True/False per customer (left), ", c("loc"), " keeps the True rows, and the list picks two columns by name."],
+      code: 'df.loc[df.hotel == "Santiago", ["hotel", "adr"]]', mode: "loc", rows: [1, 5], cols: [0, 2], mask: true,
+      out: "               hotel     adr\nbooking_id                  \nAH-204908   Santiago  115.22\nAH-200967   Santiago  139.19",
+      cap: (c) => [el("b", { text: "A condition picks the rows. " }), c('df.hotel == "Santiago"'), " gives one True/False per booking (left), ", c("loc"), " keeps the True rows, and the list picks two columns by name."],
     },
     {
       code: "df.iloc[2]", mode: "iloc", rows: [2], cols: ALL,
-      out: "plan             Plus\nage                51\nmonthly_bill    41.37\nchurned             0\nName: CM-10861, dtype: object",
-      cap: (c) => [el("b", { text: "One position, no column: " }), "the whole third row, as a Series named after its label, ", c("CM-10861"), "."],
+      out: "hotel       Viña del Mar\nnights                 5\nadr                68.57\ncanceled               0\nName: AH-202738, dtype: object",
+      cap: (c) => [el("b", { text: "One position, no column: " }), "the whole third booking, as a Series named after its label, ", c("AH-202738"), "."],
     },
     {
       code: "df.loc[2]", mode: "loc", rows: [], cols: [], error: true, out: "KeyError: 2",
-      cap: (c) => [el("b", { text: "No label is called 2. " }), c("loc"), " searched the customer IDs and found nothing. With the default 0, 1, 2… index, ", c("loc[2]"), " and ", c("iloc[2]"), " happen to agree, which is why this mistake hides until the index changes."],
+      cap: (c) => [el("b", { text: "No booking is called 2. " }), c("loc"), " searched the booking IDs and found nothing. With the default 0, 1, 2… index, ", c("loc[2]"), " and ", c("iloc[2]"), " happen to agree, which is why this mistake hides until the index changes."],
     },
   ];
 
   HZ.register("loc-iloc", {
-    kicker: "Session 2",
+    kicker: "Week 2",
     title: "loc reads labels, iloc counts positions",
     mount(body) {
       body.classList.add("hz-loc-iloc");
@@ -64,7 +66,7 @@
       const c = (s) => el("code", { text: s });
 
       body.append(el("p", { class: "hz-x__lede" }, [
-        "Six customers with ", c("customer_id"), " as the index, so the row labels are not 0, 1, 2. The grey numbers are positions. Pick an expression and watch which axis pandas reads.",
+        "Six bookings with ", c("booking_id"), " as the index, so the row labels are not 0, 1, 2. The grey numbers are positions. Pick an expression and watch which axis pandas reads.",
       ]));
 
       const chips = PRESETS.map((p, k) => el("button", { type: "button", class: "hz-loc-iloc-chip", onclick: () => run(k) }, p.code));
@@ -80,7 +82,7 @@
       const table = el("table", { class: "hz-loc-iloc-table" }, [
         el("thead", {}, [
           el("tr", {}, [el("th"), el("th"), ...posTop]),
-          el("tr", {}, [gutterHead, el("th", { class: "hz-loc-iloc-idxname", html: "customer_<wbr>id" }), ...heads]),
+          el("tr", {}, [gutterHead, el("th", { class: "hz-loc-iloc-idxname", html: "booking_<wbr>id" }), ...heads]),
         ]),
         el("tbody", {}, IDS.map((_, i) => el("tr", {}, [posLeft[i], labels[i], ...cells[i]]))),
       ]);
@@ -139,7 +141,7 @@
         }
         if (p.mask) {
           gutterHead.textContent = "mask";
-          const plus = ROWS.map((r) => r[0] === "Plus");
+          const plus = ROWS.map((r) => r[0] === MASK_VALUE);
           posLeft.forEach((n, i) => {
             n.textContent = plus[i] ? "True" : "False";
           });
@@ -244,6 +246,8 @@
   .md-typeset table.hz-loc-iloc-table { font-size: 0.54rem; border-spacing: 1px; width: 100%; }
   .md-typeset .hz-loc-iloc-table .hz-loc-iloc-name, .md-typeset .hz-loc-iloc-table .hz-loc-iloc-idxname { white-space: normal; vertical-align: bottom; }
   .md-typeset .hz-loc-iloc-wrap { flex-basis: 100%; }
+  .md-typeset .hz-loc-iloc-table td.is-text { white-space: normal; text-align: left; min-width: 3.4em; }
+  .md-typeset .hz-loc-iloc-table .hz-loc-iloc-label { font-size: 0.9em; padding-left: 0.1em; padding-right: 0.1em; }
 }
 `,
   });

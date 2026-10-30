@@ -1,14 +1,15 @@
-/* Session 4: the accuracy trap. 100 Cordillera customers, some of whom will
-   cancel. A model that always says "stays" is right about every stayer, so its
-   accuracy equals the share of stayers, while it catches no churner at all. */
+/* Week 4: the accuracy trap. 100 Altamar bookings, about a third of which
+   will be cancelled. A model that always says "shows up" is right about every
+   guest who arrives, so its accuracy equals the share of guests who show up,
+   while it catches no cancellation at all. */
 (function () {
   const { el, svg, slider, segmented, stats, rng, tween } = HZ;
 
   const N = 100, COLS = 10, CELL = 44, PAD = 6;
   const W = COLS * CELL + 2 * PAD, H = (N / COLS) * CELL + 2 * PAD;
 
-  // Fixed shuffle: the first k positions of this order are the churners, so
-  // moving the slider adds or removes churners without reshuffling the grid.
+  // Fixed shuffle: the first k positions of this order are the cancellations, so
+  // moving the slider adds or removes them without reshuffling the grid.
   function order() {
     const r = rng(404);
     const idx = Array.from({ length: N }, (_, i) => i);
@@ -24,10 +25,10 @@
   function mount(body) {
     body.classList.add("hz-at");
     const rank = order();
-    let k = 16; // churners out of 100
+    let k = 34; // cancellations out of 100 (Altamar: 33.7%)
     let mode = "none";
 
-    const fig = svg("svg", { viewBox: `0 0 ${W} ${H}`, class: "hz-at-grid", role: "img", "aria-label": "100 customers; orange ones will cancel" });
+    const fig = svg("svg", { viewBox: `0 0 ${W} ${H}`, class: "hz-at-grid", role: "img", "aria-label": "100 bookings; orange ones will be cancelled" });
     const icons = [];
     for (let i = 0; i < N; i++) {
       const cx = PAD + (i % COLS) * CELL + CELL / 2;
@@ -53,21 +54,21 @@
       return { node, set(v) { fill.style.width = v === null ? "0%" : v * 100 + "%"; val.textContent = v === null ? "–" : Math.round(v * 100) + "%"; } };
     };
     const acc = meter("Accuracy", "is-acc");
-    const rec = meter("Recall: churners caught", "is-rec");
+    const rec = meter("Recall: cancellations caught", "is-rec");
     const readout = stats();
     const note = el("p", { class: "hz-x__note", "aria-live": "polite" });
 
     const seg = segmented(
       [
         { value: "none", label: "No model" },
-        { value: "stay", label: "Always “stays”" },
-        { value: "leave", label: "Always “leaves”" },
+        { value: "stay", label: "Always “shows up”" },
+        { value: "leave", label: "Always “cancels”" },
       ],
       mode,
       (v) => { mode = v; draw(true); }
     );
     seg.node.setAttribute("aria-label", "Which model predicts");
-    const s = slider({ label: "Churn rate", min: 5, max: 50, step: 1, value: k, format: (v) => v + "%", oninput: (v) => { k = v; draw(false); } });
+    const s = slider({ label: "Cancellation rate", min: 5, max: 60, step: 1, value: k, format: (v) => v + "%", oninput: (v) => { k = v; draw(false); } });
 
     let run = 0;
     function draw(sweep) {
@@ -88,35 +89,35 @@
       if (mode === "none") {
         acc.set(null);
         rec.set(null);
-        readout.set([["Will leave", `${k} of 100`, "is-a"], ["Will stay", `${stay} of 100`, "is-b"]]);
-        note.innerHTML = `Orange customers will cancel, teal ones will stay: <strong>${k} of these 100</strong> are leaving. Pick a model above and see how it scores.`;
+        readout.set([["Will cancel", `${k} of 100`, "is-a"], ["Will show up", `${stay} of 100`, "is-b"]]);
+        note.innerHTML = `Orange bookings will be cancelled, teal ones will arrive: <strong>${k} of these 100</strong> cancel. Pick a model above and see how it scores.`;
       } else if (mode === "stay") {
         acc.set(stay / N);
         rec.set(0);
-        readout.set([["Correct", `${stay} of 100`], ["Churners caught", `0 of ${k}`, "is-bad"], ["Calls made", "0"]]);
+        readout.set([["Correct", `${stay} of 100`], ["Cancellations caught", `0 of ${k}`, "is-bad"], ["Rooms resold", "0"]]);
         note.innerHTML =
-          k <= 20
-            ? `Right about all ${stay} stayers, so accuracy is <strong>${stay}%</strong>, and not one of the ${k} leavers is caught. Accuracy just repeats the share of customers who stay.`
-            : `With ${k}% churn the same lazy model drops to ${stay}% accuracy. It only looked good because churn was rare; it never caught anyone.`;
+          k <= 40
+            ? `Right about all ${stay} guests who show up, so accuracy is <strong>${stay}%</strong>, and not one of the ${k} cancellations is caught: ${k} rooms sit empty. Accuracy just repeats the share of guests who arrive.`
+            : `With ${k}% cancellations the same lazy model drops to ${stay}% accuracy. It only looked good while cancellations were the minority; it never caught one.`;
       } else {
         acc.set(k / N);
         rec.set(1);
-        readout.set([["Correct", `${k} of 100`], ["Churners caught", `${k} of ${k}`, "is-good"], ["Wasted calls", String(stay), "is-bad"]]);
-        note.innerHTML = `Calling everyone catches all ${k} leavers (recall 100%), but accuracy falls to <strong>${k}%</strong> and ${stay} offers go to people who would have stayed. Neither extreme is a model: we need one that tells them apart.`;
+        readout.set([["Correct", `${k} of 100`], ["Cancellations caught", `${k} of ${k}`, "is-good"], ["Guests walked", String(stay), "is-bad"]]);
+        note.innerHTML = `Reselling every room catches all ${k} cancellations (recall 100%), but accuracy falls to <strong>${k}%</strong> and ${stay} guests arrive to find their room sold. Neither extreme is a model: we need one that tells them apart.`;
       }
     }
 
     body.append(
-      el("p", { class: "hz-x__lede", html: "Each icon is a Cordillera customer; the colour is what <em>really</em> happens. The tile behind it is what the model <em>predicts</em>, and a red cross marks a mistake." }),
+      el("p", { class: "hz-x__lede", html: "Each icon is an Altamar booking; the colour is what <em>really</em> happens. The tile behind it is what the model <em>predicts</em>, and a red cross marks a mistake." }),
       el("div", { class: "hz-x__controls" }, [seg.node, s.node]),
       el("div", { class: "hz-x__split" }, [
         el("div", {}, [
           fig,
           el("div", { class: "hz-legend" }, [
-            el("span", {}, [el("i", { style: "background: var(--hz-a)" }), "will leave"]),
-            el("span", {}, [el("i", { style: "background: var(--hz-b)" }), "will stay"]),
-            el("span", {}, [el("i", { style: "background: var(--hz-b-soft); border: 1px solid var(--hz-b); border-radius: 3px" }), "tile: predicts “stays”"]),
-            el("span", {}, [el("i", { style: "background: var(--hz-a-soft); border: 1px solid var(--hz-a); border-radius: 3px" }), "tile: predicts “leaves”"]),
+            el("span", {}, [el("i", { style: "background: var(--hz-a)" }), "will cancel"]),
+            el("span", {}, [el("i", { style: "background: var(--hz-b)" }), "will show up"]),
+            el("span", {}, [el("i", { style: "background: var(--hz-b-soft); border: 1px solid var(--hz-b); border-radius: 3px" }), "tile: predicts “shows up”"]),
+            el("span", {}, [el("i", { style: "background: var(--hz-a-soft); border: 1px solid var(--hz-a); border-radius: 3px" }), "tile: predicts “cancels”"]),
             el("span", {}, [el("i", { style: "background: var(--hz-bad)" }), "model is wrong"]),
           ]),
         ]),
@@ -128,7 +129,7 @@
   }
 
   HZ.register("accuracy-trap", {
-    kicker: "Session 4",
+    kicker: "Week 4",
     title: "The accuracy trap",
     mount,
     css: `
