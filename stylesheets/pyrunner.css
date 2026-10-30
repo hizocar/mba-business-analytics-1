@@ -1,0 +1,116 @@
+/* Runnable Python (pyrunner.js) */
+
+/* The notebook CSS gives output wrappers display:flex, which beats the hidden attribute */
+.jupyter-wrapper [hidden], .md-typeset .hz-run-mdout[hidden] { display: none !important; }
+
+/* Toolbar pinned under the header while you scroll a notebook */
+.hz-run-bar {
+  position: sticky;
+  top: 2.4rem;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.8rem;
+  margin: 0 0 1.2rem;
+  padding: 0.55rem 0.7rem 0.55rem 0.9rem;
+  background: color-mix(in srgb, var(--md-default-bg-color) 88%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--hz-line);
+  border-radius: 14px;
+  font-size: 0.68rem;
+}
+.hz-run-dot { width: 0.55rem; height: 0.55rem; border-radius: 50%; background: var(--hz-muted); flex: none; }
+.hz-run-bar[data-state="ready"] .hz-run-dot { background: var(--hz-good); }
+.hz-run-bar[data-state="loading"] .hz-run-dot,
+.hz-run-bar[data-state="busy"] .hz-run-dot { background: var(--md-primary-fg-color); animation: hz-pulse 1s ease-in-out infinite; }
+@keyframes hz-pulse { 50% { opacity: 0.3; transform: scale(0.75); } }
+.hz-run-status { flex: 1 1 14rem; color: var(--md-default-fg-color--light); }
+.hz-run-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+
+.md-typeset .hz-run-btn,
+.hz-run-btn {
+  font: inherit;
+  font-size: 0.66rem;
+  font-weight: 600;
+  line-height: 1.2;
+  padding: 0.45em 0.95em;
+  border-radius: 999px;
+  border: 1px solid var(--hz-line);
+  background: var(--md-default-bg-color);
+  color: var(--md-default-fg-color);
+  cursor: pointer;
+  text-decoration: none;
+  transition: border-color 150ms ease, background-color 150ms ease, transform 100ms ease;
+}
+.hz-run-btn:hover { border-color: var(--md-primary-fg-color); color: var(--md-default-fg-color); }
+.hz-run-btn:active { transform: scale(0.97); }
+.hz-run-btn--primary, .md-typeset .hz-run-btn--primary { background: var(--md-primary-fg-color); border-color: var(--md-primary-fg-color); color: #fff8f0; }
+.hz-run-btn--primary:hover { background: var(--md-primary-fg-color--dark); color: #fff8f0; }
+
+/* Notebook cells: the "In [ ]" prompt becomes a play button + execution count */
+.jupyter-wrapper .hz-run-cell .jp-InputPrompt { display: flex; flex-direction: column; align-items: flex-end; gap: 0.2rem; overflow: visible; opacity: 1; }
+.hz-run-play {
+  display: grid;
+  place-items: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--hz-line);
+  background: var(--md-default-bg-color);
+  color: var(--md-primary-fg-color);
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease, transform 100ms ease;
+}
+.hz-run-play svg { width: 0.75rem; height: 0.75rem; fill: currentColor; margin-left: 2px; }
+.hz-run-play:hover { background: var(--md-primary-fg-color); color: #fff8f0; border-color: var(--md-primary-fg-color); }
+.hz-run-play:active { transform: scale(0.92); }
+.hz-run-play:focus-visible { outline: 2px solid var(--md-primary-fg-color); outline-offset: 2px; }
+.hz-run-count { font-family: var(--md-code-font); font-size: 0.6rem; color: var(--hz-muted); min-height: 1em; }
+.hz-run-count:not(:empty)::before { content: "["; }
+.hz-run-count:not(:empty)::after { content: "]"; }
+
+.hz-run-cell.is-queued .hz-run-play { border-style: dashed; }
+.hz-run-cell.is-running .hz-run-play { background: var(--md-primary-fg-color); color: #fff8f0; animation: hz-pulse 1s ease-in-out infinite; }
+
+.jupyter-wrapper .hz-run-cell .highlight-ipynb pre { outline: none; cursor: text; border-radius: 6px; transition: box-shadow 150ms ease; }
+.jupyter-wrapper .hz-run-cell .highlight-ipynb pre:focus { box-shadow: inset 0 0 0 1px var(--md-primary-fg-color); }
+
+.hz-run-live { animation: hz-out-in 220ms ease-out; }
+@keyframes hz-out-in { from { opacity: 0; transform: translateY(-3px); } }
+.jupyter-wrapper .hz-run-error pre,
+.hz-run-mdout .hz-run-error pre { color: var(--hz-bad); background: color-mix(in srgb, var(--hz-bad) 8%, transparent); border-radius: 6px; padding: 0.5em 0.7em; }
+.jupyter-wrapper .hz-run-stderr pre { background: color-mix(in srgb, var(--md-primary-fg-color) 8%, transparent); }
+.jupyter-wrapper .hz-run-html { overflow-x: auto; }
+
+/* input() answers */
+.hz-run-inputs { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.7rem 0.8rem; margin: 0.3rem 0; border: 1px dashed var(--md-primary-fg-color); border-radius: 10px; font-size: 0.7rem; }
+.hz-run-inputs p { margin: 0; color: var(--md-default-fg-color--light); }
+.hz-run-inputs label { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; font-family: var(--md-code-font); }
+.hz-run-inputs input { font: inherit; padding: 0.35em 0.6em; border: 1px solid var(--hz-line); border-radius: 6px; background: var(--md-default-bg-color); color: var(--md-default-fg-color); min-width: 10rem; }
+.hz-run-inputs input:focus { outline: 2px solid var(--md-primary-fg-color); outline-offset: 1px; }
+.hz-run-inputs .hz-run-btn { align-self: flex-start; }
+
+/* Markdown pages */
+.md-typeset .hz-run-md { position: relative; }
+.md-typeset .hz-run-md pre > code { padding-bottom: 3em; } /* room for the Run button */
+.md-typeset .hz-run-md code[contenteditable] { outline: none; }
+.md-typeset .hz-run-md code[contenteditable]:focus { box-shadow: inset 0 0 0 1px var(--md-primary-fg-color); }
+.md-typeset .hz-run-mdbtn { position: absolute; right: 0.5rem; bottom: 0.5rem; }
+.md-typeset .hz-run-mdout { margin: -0.4em 0 1em; padding: 0.6em 0.8em; border: 1px solid var(--hz-line); border-radius: 0 0 8px 8px; font-size: 0.7rem; overflow-x: auto; }
+.md-typeset .hz-run-mdout pre { margin: 0; white-space: pre-wrap; font-family: var(--md-code-font); }
+.md-typeset .hz-run-mdout img { max-width: 100%; }
+.md-typeset .hz-run-mdout table { font-size: 0.65rem; border: 0; border-collapse: collapse; box-shadow: none; display: table; }
+.md-typeset .hz-run-mdout table th, .md-typeset .hz-run-mdout table td { border: 0; border-bottom: 1px solid var(--hz-line); padding: 0.35em 0.7em; text-align: right; white-space: nowrap; }
+.md-typeset .hz-run-mdout table thead th { background: transparent; font-weight: 600; border-bottom-color: var(--md-default-fg-color--light); }
+.md-typeset .hz-run-mdout table tbody th { color: var(--hz-muted); font-weight: 400; }
+.md-typeset .hz-run-mdout table tbody tr:hover { background: var(--hz-surface); }
+
+/* On phones the bar scrolls with the page instead of covering a third of the screen */
+@media (max-width: 44em) {
+  .hz-run-bar { position: static; backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .hz-run-status { flex-basis: calc(100% - 1.5rem); }
+}
+.md-typeset .hz-run-slow, .hz-run-slow { margin: 0.2rem 0 0.4rem; font-size: 0.66rem; color: var(--md-default-fg-color--light); }
