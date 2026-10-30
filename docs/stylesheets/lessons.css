@@ -1,0 +1,51 @@
+/* Class notebooks (Session_*.ipynb): hero, numbered ideas, project mirror */
+
+/* The hero is the first markdown cell: kicker, h1, lede, and the meta pills */
+.md-typeset .jp-RenderedMarkdown:has(> .hz-lesson-meta) { padding: 1.2rem 0 1.2rem; border-bottom: 1px solid var(--hz-line); margin-bottom: 1rem; }
+.md-typeset .jp-RenderedMarkdown:has(> .hz-lesson-meta) h1 { font-size: clamp(2.3rem, 5vw, 3.6rem); margin: 0.15em 0 0.3em; }
+.md-typeset .jp-RenderedMarkdown:has(> .hz-lesson-meta) > p:not(.hz-kicker) { font-size: 1rem; line-height: 1.6; max-width: 40em; margin: 0 0 0.9rem; }
+.md-typeset .jupyter-wrapper ul.hz-lesson-meta, .md-typeset ul.hz-lesson-meta { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0; padding: 0; list-style: none; }
+.md-typeset .jupyter-wrapper ul.hz-lesson-meta li, .md-typeset .hz-lesson-meta li {
+  margin: 0;
+  font-family: var(--md-code-font);
+  font-size: 0.64rem;
+  padding: 0.25em 0.7em;
+  border-radius: 999px;
+  border: 1px solid var(--hz-line);
+  color: var(--md-default-fg-color--light);
+}
+.md-typeset .hz-lesson-meta li::before { content: none; }
+
+/* Each idea of the lesson is an h2 with its number in a mono badge */
+.md-typeset .hz-lesson h2 { margin-top: 2.6em; padding-top: 1.4em; border-top: 1px solid var(--hz-line); }
+.md-typeset .hz-step-n {
+  display: inline-block;
+  font-family: var(--md-code-font);
+  font-size: 0.6em;
+  font-weight: 500;
+  color: var(--md-primary-fg-color);
+  margin-right: 0.5em;
+  vertical-align: 0.2em;
+}
+
+/* "Try it" admonition: the python block inside becomes runnable */
+.md-typeset .admonition.try, .md-typeset details.try { border-color: var(--md-primary-fg-color); }
+.md-typeset .try > .admonition-title, .md-typeset .try > summary { background-color: color-mix(in srgb, var(--md-primary-fg-color) 10%, transparent); }
+.md-typeset .try > .admonition-title::before, .md-typeset .try > summary::before {
+  background-color: var(--md-primary-fg-color);
+  -webkit-mask-image: var(--md-admonition-icon--example);
+  mask-image: var(--md-admonition-icon--example);
+}
+
+/* Classes page: the five sessions as one thread */
+.md-typeset .hz-thread { position: relative; display: flex; flex-direction: column; gap: 0.8rem; margin: 1.6rem 0 2rem; padding-left: 1.4rem; }
+.md-typeset .hz-thread::before { content: ""; position: absolute; left: 0.35rem; top: 0.6rem; bottom: 0.6rem; width: 2px; background: linear-gradient(var(--md-primary-fg-color), var(--hz-line)); border-radius: 2px; }
+.md-typeset .hz-thread-step { position: relative; background: var(--hz-surface); border: 1px solid var(--hz-line); border-radius: 16px; padding: 0.9rem 1.2rem 1rem; transition: border-color 150ms ease, transform 150ms ease; }
+.md-typeset .hz-thread-step:hover { border-color: var(--md-primary-fg-color); transform: translateX(2px); }
+.md-typeset .hz-thread-step::before { content: ""; position: absolute; left: -1.38rem; top: 1.15rem; width: 0.7rem; height: 0.7rem; border-radius: 50%; background: var(--md-default-bg-color); border: 2px solid var(--md-primary-fg-color); }
+.md-typeset .hz-thread-step h3 { font-family: var(--hz-serif); font-weight: 400; font-size: 1.5em; margin: 0.2em 0 0.3em; }
+.md-typeset .hz-thread-step h3 a { color: var(--md-default-fg-color); }
+.md-typeset .hz-thread-step h3 a:hover { color: var(--md-primary-fg-color); }
+.md-typeset .hz-thread-step p { margin: 0.3em 0; }
+.md-typeset .hz-thread-adv { display: inline-block; margin-top: 0.3rem; font-family: var(--md-code-font); font-size: 0.64rem; color: var(--md-primary-fg-color); }
+@media (prefers-reduced-motion: reduce) { .md-typeset .hz-thread-step { transition: none; } }

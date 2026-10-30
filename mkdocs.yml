@@ -1,0 +1,103 @@
+# Project information
+site_name: Business Analytics I · From Python to Nonlinear Models
+site_url: https://hizocar.github.io/mba-business-analytics-1/
+site_author: Sebastian Azocar
+site_description: MBA diploma module. Python, data analysis and machine learning for managers, from linear models to random forests and gradient boosting, with interactive simulators and ready-to-run code.
+repo_url: https://github.com/hizocar/mba-business-analytics-1
+repo_name: mba-business-analytics-1
+edit_uri: ""
+
+# Markdown extensions
+markdown_extensions:
+  - attr_list
+  - admonition
+  - md_in_html
+  - tables
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+      pygments_lang_class: true   # lets pyrunner.js find the ```python blocks
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tabbed:
+      alternate_style: true
+
+# Math in the notebooks is typeset by the MathJax 2 that mkdocs-jupyter adds to
+# each notebook page. Explainers load on demand from javascripts/explainers/.
+extra_javascript:
+  - javascripts/pyrunner.js
+  - javascripts/hz-core.js
+extra_css:
+  - stylesheets/extra.css
+  - stylesheets/interactive.css
+  - stylesheets/pyrunner.css
+  - stylesheets/lessons.css
+
+# Theme
+theme:
+  name: material
+  language: en
+  logo: images/logo.bmp
+  favicon: images/logo_python.svg
+  font: false
+  features:
+    - navigation.tabs
+    - navigation.top
+    - content.code.annotate
+    - search.suggest
+    - search.highlight
+  palette:
+    - media: '(prefers-color-scheme: light)'
+      scheme: default
+      primary: deep orange
+      accent: deep orange
+      toggle:
+        icon: material/toggle-switch-off-outline
+        name: Switch to dark mode
+    - media: '(prefers-color-scheme: dark)'
+      scheme: slate
+      primary: deep orange
+      accent: deep orange
+      toggle:
+        icon: material/toggle-switch
+        name: Switch to light mode
+
+# Customization
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/hizocar
+
+# Plugins
+plugins:
+  - mkdocs-jupyter:
+      kernel_name: python3
+  - search
+
+# Navigation
+nav:
+  - Home: index.md
+  - Program: program.md
+  - Sessions:
+      - The six sessions: sessions/sessions.md
+      - "1 · Live: Reading data like a manager": sessions/Session_1_Live.ipynb
+      - "1 · Lab: First look at Altamar": sessions/Session_1_Lab.ipynb
+      - "2 · Live: From raw data to insight": sessions/Session_2_Live.ipynb
+      - "2 · Lab: Seasons by hotel": sessions/Session_2_Lab.ipynb
+      - "3 · Live: Pricing with regression": sessions/Session_3_Live.ipynb
+      - "3 · Lab: A rate simulator": sessions/Session_3_Lab.ipynb
+      - "4 · Live: Predicting cancellations": sessions/Session_4_Live.ipynb
+      - "4 · Lab: An overbooking policy": sessions/Session_4_Lab.ipynb
+      - "5 · Live: When lines are not enough": sessions/Session_5_Live.ipynb
+      - "5 · Lab: Tuning a tree": sessions/Session_5_Lab.ipynb
+      - "6 · Live: Forests, boosting and decisions": sessions/Session_6_Live.ipynb
+      - "6 · Lab: Choosing and explaining a model": sessions/Session_6_Lab.ipynb
+  - Applied case:
+      - Brief and rubric: case/case.md
+      - Case toolkit: case/Case_Toolkit.ipynb
+  - Datasets: datasets/datasets.md
+  - Colab guide: colab.md
