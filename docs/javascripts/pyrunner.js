@@ -145,10 +145,18 @@
 
   // input() can't block a Web Worker, so answers are collected before the run.
   function promptsIn(code) {
+    // Blank out comments and string literals (same length, so positions still
+    // match) so that "input(" inside a chart title or a comment is not a call.
+    const bare = code.replace(/#[^\n]*|"""[\s\S]*?"""|'''[\s\S]*?'''|"(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'/g, (s) =>
+      s.startsWith("#") ? " ".repeat(s.length) : s[0] + " ".repeat(s.length - 2) + s[s.length - 1]
+    );
     const found = [];
-    const re = /\binput\s*\(\s*(?:(['"])(.*?)\1)?/g;
+    const re = /(^|[^\w.])input\s*\(/g;
     let m;
-    while ((m = re.exec(code))) found.push(m[2] || "input()");
+    while ((m = re.exec(bare))) {
+      const literal = /^\s*(['"])(.*?)\1/.exec(code.slice(re.lastIndex));
+      found.push(literal ? literal[2] : "input()");
+    }
     return found;
   }
 

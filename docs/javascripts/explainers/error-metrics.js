@@ -1,16 +1,22 @@
 /*
- * error-metrics: Session 3. Ten customers, each with a residual bar
- * (actual bill − predicted bill). MAE, RMSE and R² update live. Dragging one
- * customer into an outlier shows RMSE jumping much more than MAE, and two
- * share bars show why: squaring hands the big miss most of the total.
+ * error-metrics: Week 3. Ten real test bookings, each with a residual bar
+ * (actual rate − predicted rate, USD per night) from this week's linear
+ * model. MAE, RMSE and R² update live. Turning one booking into a big miss
+ * shows RMSE jumping much more than MAE, and two share bars show why:
+ * squaring hands the big miss most of the total.
  */
 (function () {
   const { el, svg } = HZ;
 
-  const PRED = [14.2, 18.9, 22.5, 25.1, 28.4, 31.7, 35.0, 38.6, 43.2, 47.5];
-  const ERR0 = [2.4, -3.1, 1.3, -0.9, 3.6, -2.2, 0.6, -1.8, 2.9, -1.6];
-  const OUT = 6, OUT_ERR = 25; // customer 7 becomes the outlier
-  const Y0 = -10, Y1 = 30;
+  // Ten test bookings from Session_3_Live (rounded): predicted rate and actual − predicted.
+  const PRED = [63.7, 67.8, 82.2, 91.2, 105.0, 114.4, 123.8, 126.1, 129.6, 213.8];
+  const ERR0 = [20.5, 23.5, 15.0, 12.6, -12.6, -34.0, -35.3, -7.7, -3.7, 30.0];
+  const WHO = ["Santiago · Jun · Standard", "Santiago · Mar · Standard", "Viña · Apr · Standard", "Santiago · Nov · Standard",
+               "Viña · Sep · Standard", "Viña · Sep · Standard", "Viña · Jun · Superior", "Viña · Jan · Standard",
+               "Viña · Mar · Superior", "Viña · Feb · Superior"];
+  const OUT = 6, OUT_ERR = 104; // booking 7 becomes a peak-season miss
+  const Y0 = -60, Y1 = 120;
+  const usd = (v) => "USD " + Math.abs(v).toFixed(1);
 
   function metrics(err) {
     const n = err.length;
@@ -25,11 +31,11 @@
   function layout(narrow) {
     return narrow
       ? { W: 340, H: 270, narrow, M: { l: 64, r: 8, t: 16, b: 34 } }
-      : { W: 520, H: 290, narrow, M: { l: 70, r: 14, t: 16, b: 36 } };
+      : { W: 520, H: 290, narrow, M: { l: 66, r: 14, t: 16, b: 36 } };
   }
 
   const css = `
-.md-typeset .hz-x svg.hz-em-plot text { font-size: 12.5px; }
+.md-typeset .hz-x svg.hz-em-plot text { font-size: 13px; }
 .md-typeset .hz-em-zero { stroke: var(--hz-ink); stroke-width: 1.5; }
 .md-typeset .hz-x svg text.hz-em-zerolab { fill: var(--hz-ink); font-size: 12px; }
 .md-typeset .hz-em-bar { transition: fill 200ms ease; }
@@ -42,7 +48,11 @@
 .md-typeset .hz-em-pt:focus-visible .hz-em-dot { stroke: var(--md-primary-fg-color); stroke-width: 3; }
 .md-typeset .hz-em-hit { fill: transparent; }
 .md-typeset .hz-x svg text.hz-em-val { font-size: 12px; fill: var(--md-default-fg-color); }
-.md-typeset .hz-em-side { display: flex; flex-direction: column; gap: 0.9rem; }
+.md-typeset .hz-em-layout { display: flex; flex-direction: column; gap: 1rem; }
+.md-typeset .hz-em-layout svg.hz-em-plot { width: 100%; max-width: 40rem; display: block; margin: 0 auto; }
+.md-typeset .hz-em-side { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 0.8rem 1.4rem; align-items: start; }
+.md-typeset .hz-em-shares { display: flex; flex-direction: column; gap: 0.7rem; }
+@media (max-width: 40em) { .md-typeset .hz-em-side { grid-template-columns: minmax(0, 1fr); } }
 .md-typeset .hz-em-big { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.4rem; }
 .md-typeset .hz-em-m { border: 1px solid var(--hz-line); border-radius: 10px; padding: 0.45rem 0.55rem; background: var(--md-default-bg-color); }
 .md-typeset .hz-em-m span { display: block; font-size: 0.62rem; color: var(--md-default-fg-color--light); }
@@ -58,8 +68,8 @@
 `;
 
   HZ.register("error-metrics", {
-    kicker: "Session 3",
-    title: "MAE, RMSE and R², live",
+    kicker: "Week 3",
+    title: "How wrong is the rate? MAE, RMSE and R²",
     css,
     mount(body) {
       body.classList.add("hz-em", "tex2jax_ignore"); // keep MathJax away from the dollar amounts
@@ -67,14 +77,14 @@
       let L = layout(false);
 
       body.append(el("p", { class: "hz-x__lede", html:
-        "Ten customers from the test set. Each bar is a <strong>residual</strong>: actual bill minus predicted bill (above the line, the model guessed too low). <strong>Drag any dot</strong> up or down, or turn one customer into an outlier." }));
+        "Ten bookings from the sealed test set. Each bar is a <strong>residual</strong>: the rate the guest actually paid minus the rate the model predicted, in USD per night (above the line, the model priced too low). <strong>Drag any dot</strong> up or down, or add one big miss." }));
 
-      const plot = svg("svg", { class: "hz-em-plot", role: "group", "aria-label": "Residuals of ten customers" });
+      const plot = svg("svg", { class: "hz-em-plot", role: "group", "aria-label": "Residuals of ten test bookings" });
       const mk = (name, sub) => {
         const v = el("strong"), d = el("em");
         return { node: el("div", { class: "hz-em-m" }, [el("span", { text: name }), v, d]), v, d };
       };
-      const mMAE = mk("MAE", "$"), mRMSE = mk("RMSE", "$"), mR2 = mk("R²", "0 to 1");
+      const mMAE = mk("MAE, USD"), mRMSE = mk("RMSE, USD"), mR2 = mk("R²");
       const shareAbs = el("div", { class: "hz-em-stack" }), shareSq = el("div", { class: "hz-em-stack" });
       const segsAbs = PRED.map(() => el("i", { class: "hz-em-seg" }));
       const segsSq = PRED.map(() => el("i", { class: "hz-em-seg" }));
@@ -82,21 +92,23 @@
       shareSq.append(...segsSq);
       const absTxt = el("span"), sqTxt = el("span");
       const note = el("p", { class: "hz-x__note", "aria-live": "polite" });
-      const outBtn = HZ.button("Make customer 7 an outlier", () => animateTo(OUT, OUT_ERR), "primary");
+      const outBtn = HZ.button("Make booking 7 a big miss", () => animateTo(OUT, OUT_ERR), "primary");
       const resetBtn = HZ.button("Reset", () => reset());
 
       const legend = el("div", { class: "hz-legend" }, [
-        el("span", {}, [el("i", { style: "background: var(--hz-ink); border-radius: 1px; height: 2px; vertical-align: 0.2em" }), "$0 line = perfect prediction"]),
-        el("span", {}, [el("i", { style: "background: var(--hz-a)" }), "bill higher than predicted"]),
-        el("span", {}, [el("i", { style: "background: var(--hz-b)" }), "bill lower than predicted"]),
+        el("span", {}, [el("i", { style: "background: var(--hz-ink); border-radius: 1px; height: 2px; vertical-align: 0.2em" }), "0 = rate predicted exactly"]),
+        el("span", {}, [el("i", { style: "background: var(--hz-a)" }), "paid more than predicted"]),
+        el("span", {}, [el("i", { style: "background: var(--hz-b)" }), "paid less than predicted"]),
       ]);
       body.append(
-        el("div", { class: "hz-x__split" }, [
+        el("div", { class: "hz-em-layout" }, [
           el("div", {}, [plot, legend]),
           el("div", { class: "hz-em-side" }, [
             el("div", { class: "hz-em-big" }, [mMAE.node, mRMSE.node, mR2.node]),
-            el("div", { class: "hz-em-share" }, [absTxt, shareAbs]),
-            el("div", { class: "hz-em-share" }, [sqTxt, shareSq]),
+            el("div", { class: "hz-em-shares" }, [
+              el("div", { class: "hz-em-share" }, [absTxt, shareAbs]),
+              el("div", { class: "hz-em-share" }, [sqTxt, shareSq]),
+            ]),
           ]),
         ]),
         el("div", { class: "hz-x__controls" }, [outBtn, resetBtn]),
@@ -110,13 +122,13 @@
         plot.setAttribute("viewBox", `0 0 ${W} ${H}`);
         xs = (i) => M.l + ((i + 0.5) * (W - M.l - M.r)) / PRED.length;
         ys = HZ.scale([Y0, Y1], [H - M.b, M.t]);
-        for (let v = Y0; v <= Y1; v += 10) {
+        for (let v = Y0; v <= Y1; v += 30) {
           plot.append(svg("line", { class: "hz-gridline", x1: M.l, x2: W - M.r, y1: ys(v), y2: ys(v) }));
-          plot.append(svg("text", { x: M.l - 8, y: ys(v) + 4, "text-anchor": "end", text: (v > 0 ? "+" : v < 0 ? "−" : "") + "$" + Math.abs(v) }));
+          plot.append(svg("text", { x: M.l - 8, y: ys(v) + 4, "text-anchor": "end", text: (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v) }));
         }
-        plot.append(svg("text", { x: 12, y: (M.t + H - M.b) / 2, transform: `rotate(-90 12 ${(M.t + H - M.b) / 2})`, "text-anchor": "middle", text: "actual − predicted" }));
-        PRED.forEach((_, i) => plot.append(svg("text", { x: xs(i), y: H - M.b + 18, "text-anchor": "middle", text: (L.narrow ? "" : "C") + (i + 1) })));
-        plot.append(svg("text", { x: (M.l + W - M.r) / 2, y: H - 2, "text-anchor": "middle", text: "customer" }));
+        plot.append(svg("text", { x: 12, y: (M.t + H - M.b) / 2, transform: `rotate(-90 12 ${(M.t + H - M.b) / 2})`, "text-anchor": "middle", text: "actual − predicted (USD)" }));
+        PRED.forEach((_, i) => plot.append(svg("text", { x: xs(i), y: H - M.b + 18, "text-anchor": "middle", text: (L.narrow ? "" : "B") + (i + 1) })));
+        plot.append(svg("text", { x: (M.l + W - M.r) / 2, y: H - 2, "text-anchor": "middle", text: "test booking" }));
         plot.append(svg("line", { class: "hz-em-zero", x1: M.l, x2: W - M.r, y1: ys(0), y2: ys(0) }));
         const bw = Math.min(26, ((W - M.l - M.r) / PRED.length) * 0.5);
         bars = PRED.map((_, i) => {
@@ -130,7 +142,7 @@
           return t;
         });
         pts = PRED.map((p, i) => {
-          const g = svg("g", { class: "hz-em-pt", tabindex: 0, role: "slider", "aria-label": `Customer ${i + 1}: predicted $${p.toFixed(2)}`, "aria-valuemin": Y0, "aria-valuemax": Y1 }, [
+          const g = svg("g", { class: "hz-em-pt", tabindex: 0, role: "slider", "aria-label": `Booking ${i + 1}, ${WHO[i]}: predicted USD ${p.toFixed(1)} per night`, "aria-valuemin": Y0, "aria-valuemax": Y1 }, [
             svg("circle", { r: 16, class: "hz-em-hit" }),
             svg("circle", { r: 6, class: "hz-em-dot" }),
           ]);
@@ -179,8 +191,8 @@
           bars[i].setAttribute("class", "hz-em-bar " + (e >= 0 ? "is-pos" : "is-neg"));
           pts[i].setAttribute("transform", `translate(${xs(i)} ${y})`);
           pts[i].setAttribute("aria-valuenow", e.toFixed(1));
-          pts[i].setAttribute("aria-valuetext", `actual bill ${e >= 0 ? "above" : "below"} the prediction by $${Math.abs(e).toFixed(1)}`);
-          const show = Math.abs(e) >= 6 || i === focus;
+          pts[i].setAttribute("aria-valuetext", `paid ${usd(e)} ${e >= 0 ? "more" : "less"} than predicted`);
+          const show = Math.abs(e) >= 45 || i === focus;
           vals[i].setAttribute("opacity", show ? 1 : 0);
           vals[i].setAttribute("x", xs(i));
           vals[i].setAttribute("y", e >= 0 ? y - 12 : y + 22);
@@ -188,8 +200,8 @@
         });
         const m = metrics(err);
         const ratio = (a, b) => (a / b > 1.05 ? "×" + (a / b).toFixed(1) : a / b < 0.95 ? "×" + (a / b).toFixed(2) : "");
-        mMAE.v.textContent = "$" + m.mae.toFixed(2);
-        mRMSE.v.textContent = "$" + m.rmse.toFixed(2);
+        mMAE.v.textContent = m.mae.toFixed(1);
+        mRMSE.v.textContent = m.rmse.toFixed(1);
         mR2.v.textContent = m.r2.toFixed(3);
         mMAE.d.textContent = ratio(m.mae, BASE.mae);
         mRMSE.d.textContent = ratio(m.rmse, BASE.rmse);
@@ -207,15 +219,16 @@
           segsAbs[i].classList.toggle("is-hot", i === focus);
           segsSq[i].classList.toggle("is-hot", i === focus);
         });
-        const c = "customer " + (focus + 1);
+        const c = "booking " + (focus + 1);
         absTxt.innerHTML = `Share of total |error| (MAE) from ${c}: <b>${Math.round((abs[focus] / sa) * 100)}%</b>`;
         sqTxt.innerHTML = `Share of total error² (RMSE) from ${c}: <b>${Math.round((sq[focus] / ss) * 100)}%</b>`;
 
         const big = err.reduce((b, e, i) => (Math.abs(e) > Math.abs(err[b]) ? i : b), 0);
-        if (Math.abs(err[big]) >= 10) {
-          note.innerHTML = `Customer ${big + 1} is off by <strong>$${Math.abs(err[big]).toFixed(1)}</strong>. MAE went from $${BASE.mae.toFixed(2)} to $${m.mae.toFixed(2)}, but RMSE from $${BASE.rmse.toFixed(2)} to $${m.rmse.toFixed(2)}: squaring makes one big miss count like many small ones. Watch <strong>RMSE</strong> when big misses are what hurt (a surprise bill makes customers call to cancel). Report <strong>MAE</strong> when every dollar of error costs the same: "we are typically off by $${m.mae.toFixed(2)}".`;
+        const avg = PRED.reduce((a, p, i) => a + p + err[i], 0) / PRED.length;
+        if (Math.abs(err[big]) >= 60) {
+          note.innerHTML = `Booking ${big + 1} is off by <strong>${usd(err[big])}</strong> per night, like the Puerto Varas suite in January that paid USD 383 when the model said 280. MAE went from ${usd(BASE.mae)} to ${usd(m.mae)}, but RMSE from ${usd(BASE.rmse)} to ${usd(m.rmse)}: squaring makes one big miss count like many small ones. Watch <strong>RMSE</strong> when big misses are what hurt (a suite sold far below its value in peak season). Report <strong>MAE</strong> to a manager: "the rate is typically off by ${usd(m.mae)} a night".`;
         } else {
-          note.innerHTML = `All misses are small and similar, so MAE ($${m.mae.toFixed(2)}) and RMSE ($${m.rmse.toFixed(2)}) are close. <strong>MAE</strong> is the average miss in dollars. <strong>RMSE</strong> is also in dollars but weighs big misses more. <strong>R²</strong> is the share of the differences between bills that the model explains: 1 is perfect, 0 is no better than predicting the average bill for everyone.`;
+          note.innerHTML = `<strong>MAE</strong> is the average miss: ${usd(m.mae)} per night, about ${Math.round((m.mae / avg) * 100)}% of these bookings' average rate (USD ${avg.toFixed(0)}). <strong>RMSE</strong> (${usd(m.rmse)}) is also in USD but weighs big misses more. <strong>R²</strong> is the share of the differences between rates that the model explains: 1 is perfect, 0 is no better than quoting the average rate to everyone.`;
         }
       }
 

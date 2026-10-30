@@ -1,28 +1,30 @@
 /*
- * if-flow: the retention team's first rule as a flowchart (Session 1).
- * Pick a contract and a number of support tickets; a token walks the
+ * if-flow: Altamar's first cancellation-risk rule as a flowchart (Week 1).
+ * Pick a booking channel and a lead time; a token walks the
  * if / elif / else path, each test shows how it evaluated, the matching
  * code line lights up, and the branches Python never looks at dim out.
  */
 (function () {
   const { el, svg } = HZ;
 
-  const MTM = "Month-to-month";
-  const CONTRACTS = [MTM, "12 months", "24 months"];
+  const MTM = "Online travel agency";
+  const CONTRACTS = [MTM, "Direct", "Corporate", "Travel agent"];
+  const SHORT = { [MTM]: "Online agency", Direct: "Direct", Corporate: "Corporate", "Travel agent": "Travel agent" };
+  const DAYS = 90;
   const CUSTOMERS = [
-    { id: "CM-10482", contract: MTM, tickets: 2 },
-    { id: "CM-10517", contract: "24 months", tickets: 0 },
-    { id: "CM-10533", contract: MTM, tickets: 4 },
-    { id: "CM-10561", contract: MTM, tickets: 3 },
-    { id: "CM-10598", contract: "12 months", tickets: 1 },
+    { id: "AH-200974", contract: MTM, tickets: 92 },
+    { id: "AH-204908", contract: MTM, tickets: 5 },
+    { id: "AH-205399", contract: "Direct", tickets: 160 },
+    { id: "AH-203206", contract: "Corporate", tickets: 12 },
+    { id: "AH-200643", contract: MTM, tickets: 199 },
   ];
   const CODE = [
-    'if contract == "Month-to-month" and support_tickets >= 3:',
-    '    risk = "at risk"',
-    'elif contract == "Month-to-month" or support_tickets >= 3:',
+    'if channel == "Online travel agency" and lead_time_days > 90:',
+    '    risk = "high"',
+    'elif channel == "Online travel agency" or lead_time_days > 90:',
     '    risk = "watch"',
     "else:",
-    '    risk = "ok"',
+    '    risk = "low"',
   ];
 
   // Geometry (vertical flowchart so it stays legible on phones)
@@ -41,11 +43,11 @@
 
   function mount(body) {
     body.classList.add("hz-if-flow");
-    let contract = MTM, tickets = 2;
+    let contract = MTM, tickets = 92;
     let runId = 0;
 
     // ---------- Figure
-    const fig = svg("svg", { viewBox: `0 0 ${W} ${H}`, class: "hz-if-flow-fig", role: "img", "aria-label": "Flowchart of the retention rule: if, elif, else" });
+    const fig = svg("svg", { viewBox: `0 0 ${W} ${H}`, class: "hz-if-flow-fig", role: "img", "aria-label": "Flowchart of the cancellation-risk rule: if, elif, else" });
 
     const edge = (from, to, label, lx, ly, anchor) => {
       const [x1, y1] = from, [x2, y2] = to;
@@ -90,7 +92,7 @@
 
     const start = svg("g", { class: "hz-if-flow-start" }, [
       svg("rect", { x: CX - 70, y: 12, width: 140, height: 34, rx: 17 }),
-      svg("text", { x: CX, y: 34, "text-anchor": "middle", text: "one customer" }),
+      svg("text", { x: CX, y: 34, "text-anchor": "middle", text: "one booking" }),
     ]);
     fig.append(start);
 
@@ -102,23 +104,24 @@
       d2no: edge(P.d2bot, P.ok, "False", CX + 8, (P.d2bot[1] + P.ok[1]) / 2 + 5, "start"),
     };
     const N = {
-      d1: diamond(D1, "Month-to-month", "AND tickets ≥ 3?"),
-      d2: diamond(D2, "Month-to-month", "OR tickets ≥ 3?"),
-      risk: box(OX, D1, "at risk", "is-risk"),
+      d1: diamond(D1, "Online agency", "AND > 90 days?"),
+      d2: diamond(D2, "Online agency", "OR > 90 days?"),
+      risk: box(OX, D1, "high", "is-risk"),
       watch: box(OX, D2, "watch", "is-watch"),
-      ok: box(CX, OKY, "ok", "is-ok"),
+      ok: box(CX, OKY, "low", "is-ok"),
     };
     const K = { if: keyword(14, D1 - B + 6, "if"), elif: keyword(14, D2 - B + 6, "elif"), else: keyword(14, OKY + 5, "else") };
     const token = svg("circle", { r: 7, class: "hz-if-flow-token", cx: P.start[0], cy: P.start[1], opacity: 0 });
     fig.append(token);
 
     // ---------- Side panel
-    const seg = HZ.segmented(CONTRACTS.map((c) => ({ value: c, label: c })), contract, (v) => { contract = v; syncPresets(); go(); });
-    const sld = HZ.slider({ label: "support_tickets", min: 0, max: 6, value: tickets, oninput: (v) => { tickets = v; syncPresets(); go(); } });
+    const seg = HZ.segmented(CONTRACTS.map((c) => ({ value: c, label: SHORT[c] })), contract, (v) => { contract = v; syncPresets(); go(); });
+    let slideTimer = null;
+    const sld = HZ.slider({ label: "lead_time_days (days between booking and arrival)", min: 0, max: 300, step: 1, value: tickets, oninput: (v) => { tickets = v; syncPresets(); clearTimeout(slideTimer); slideTimer = setTimeout(() => body.isConnected && go(), 160); } });
     const presetBtns = CUSTOMERS.map((c) =>
       el("button", {
-        type: "button", class: "hz-list-index-chip", text: c.id, title: c.contract + ", " + c.tickets + " tickets",
-        "aria-label": "Customer " + c.id + ": " + c.contract + ", " + c.tickets + " tickets",
+        type: "button", class: "hz-list-index-chip", text: c.id, title: c.contract + ", " + c.tickets + " days ahead",
+        "aria-label": "Booking " + c.id + ": " + c.contract + ", " + c.tickets + " days ahead",
         onclick: () => { contract = c.contract; tickets = c.tickets; seg.set(contract); sld.set(tickets); syncPresets(); go(); },
       })
     );
@@ -130,25 +133,25 @@
     const outcome = el("div", { class: "hz-if-flow-outcome" });
 
     const side = el("div", { class: "hz-if-flow-side" }, [
-      el("div", { class: "hz-if-flow-field" }, [el("span", { class: "hz-if-flow-flabel", text: "contract" }), seg.node]),
+      el("div", { class: "hz-if-flow-field" }, [el("span", { class: "hz-if-flow-flabel", text: "channel" }), seg.node]),
       sld.node,
       el("div", { class: "hz-if-flow-field" }, [
-        el("span", { class: "hz-if-flow-flabel", text: "or pick a customer" }),
-        el("div", { class: "hz-list-index-chips", role: "group", "aria-label": "Customers" }, presetBtns),
+        el("span", { class: "hz-if-flow-flabel", text: "or pick a booking" }),
+        el("div", { class: "hz-list-index-chips", role: "group", "aria-label": "Bookings" }, presetBtns),
       ]),
       evalBox,
       outcome,
     ]);
 
     const codeLines = CODE.map((line) => el("span", { class: "hz-if-flow-line", text: line }));
-    const code = el("pre", { class: "hz-if-flow-code", "aria-label": "The rule in Python" }, codeLines);
+    const code = el("pre", { class: "hz-if-flow-code", "aria-label": "The rule in Python", tabindex: 0 }, codeLines);
     const note = el("p", { class: "hz-x__note", "aria-live": "polite" });
 
     body.append(
       el("p", { class: "hz-x__lede" }, [
-        "The retention team's first rule, as Python reads it: test the ",
+        "Operations' first rule of thumb for cancellation risk, as Python reads it: test the ",
         el("code", { text: "if" }), "; only if it fails, test the ", el("code", { text: "elif" }),
-        "; only if that fails too, run the ", el("code", { text: "else" }), ". Change the customer and follow the dot.",
+        "; only if that fails too, run the ", el("code", { text: "else" }), ". Change the booking and follow the dot.",
       ]),
       el("div", { class: "hz-x__split" }, [el("div", { class: "hz-if-flow-figwrap" }, [fig]), side]),
       code,
@@ -161,8 +164,8 @@
       const rows = [el("p", { class: "hz-if-flow-ehead" }, [el("code", { text: which })])];
       if (which === "if") {
         rows.push(
-          el("p", {}, [el("code", { text: 'contract == "Month-to-month"' }), " → ", tv(m)]),
-          el("p", {}, [el("code", { text: "support_tickets >= 3" }), " → ", tv(t3)]),
+          el("p", {}, [el("code", { text: 'channel == "Online travel agency"' }), " → ", tv(m)]),
+          el("p", {}, [el("code", { text: "lead_time_days > 90" }), " → ", tv(t3)]),
           el("p", { class: "is-total" }, [el("code", { text: (m ? "True" : "False") + " and " + (t3 ? "True" : "False") }), " → ", tv(m && t3)])
         );
       } else {
@@ -193,9 +196,9 @@
       clear();
       note.textContent = "Python tests the if first…";
 
-      const m = contract === MTM, t3 = tickets >= 3;
+      const m = contract === MTM, t3 = tickets > DAYS;
       const pass1 = m && t3, pass2 = !pass1 && (m || t3);
-      const result = pass1 ? "at risk" : pass2 ? "watch" : "ok";
+      const result = pass1 ? "high" : pass2 ? "watch" : "low";
 
       const move = async (a, b, ms) => {
         if (instant) return place(b);
@@ -281,12 +284,12 @@
         note.textContent = caption();
       }
       function caption() {
-        const kind = contract === MTM ? MTM : contract.replace(" months", "-month");
-        const tk = tickets + (tickets === 1 ? " ticket" : " tickets");
-        if (pass1) return "Month-to-month and " + tk + ": both parts of the if are True, so risk = 'at risk'. Python stops at the first branch that matches, so the elif and the else are never even checked.";
-        if (pass2 && m) return "Month-to-month, but only " + tk + ": the if needs both, so it fails. The elif needs either one, so it passes → 'watch'.";
-        if (pass2) return tk + ", but on a " + kind + " contract: the if needs both, so it fails. The elif needs either one, so it passes → 'watch'.";
-        return "A " + kind + " contract and " + tk + ": neither condition holds, so the if and the elif both fail and Python falls through to else → 'ok'.";
+        const kind = contract === MTM ? "an online travel agency" : contract === "Direct" ? "Altamar's own website or phone" : contract === "Corporate" ? "a corporate agreement" : "a travel agent";
+        const tk = tickets + (tickets === 1 ? " day" : " days") + " ahead";
+        if (pass1) return "Booked through an online agency, " + tk + ": both parts of the if are True, so risk = 'high'. Python stops at the first branch that matches, so the elif and the else are never even checked.";
+        if (pass2 && m) return "An online agency booking, but only " + tk + ": the if needs both, so it fails. The elif needs either one, so it passes → 'watch'.";
+        if (pass2) return "Booked " + tk + ", but through " + kind + ": the if needs both, so it fails. The elif needs either one, so it passes → 'watch'.";
+        return "Booked through " + kind + ", " + tk + ": neither condition holds, so the if and the elif both fail and Python falls through to else → 'low'.";
       }
     }
 
@@ -296,8 +299,8 @@
   }
 
   HZ.register("if-flow", {
-    kicker: "Session 1",
-    title: "Following the retention rule",
+    kicker: "Week 1",
+    title: "Following a cancellation-risk rule",
     mount,
     css: `
 .md-typeset .hz-if-flow-figwrap { max-width: 26rem; width: 100%; margin: 0 auto; }
@@ -339,7 +342,7 @@
 .md-typeset .hz-if-flow-flabel { font-family: var(--md-code-font); font-size: 0.64rem; color: var(--md-default-fg-color--light); }
 .md-typeset .hz-if-flow-side .hz-x__seg { flex-wrap: wrap; max-width: 100%; border-radius: 12px; }
 .md-typeset .hz-if-flow-side .hz-x__seg button { border-radius: 9px; }
-.md-typeset .hz-if-flow-side .hz-x__slider { grid-template-columns: minmax(0, 1fr) 2em; gap: 0.2rem 0.6rem; font-family: var(--md-code-font); font-size: 0.64rem; width: 100%; }
+.md-typeset .hz-if-flow-side .hz-x__slider { grid-template-columns: minmax(0, 1fr) 2.6em; gap: 0.2rem 0.6rem; font-family: var(--md-code-font); font-size: 0.64rem; width: 100%; }
 .md-typeset .hz-if-flow-side .hz-x__slider > span { grid-column: 1 / -1; color: var(--md-default-fg-color--light); }
 .md-typeset .hz-if-flow-side .hz-list-index-chip[aria-pressed="true"] { border-color: var(--hz-a); background: var(--hz-a-soft); }
 .md-typeset .hz-if-flow-eval { display: flex; flex-direction: column; gap: 0.45rem; min-height: 6.5rem; }
@@ -355,9 +358,9 @@
 .md-typeset .hz-if-flow-outcome { min-height: 2rem; }
 .md-typeset .hz-if-flow-badge { --hz-if-c: var(--hz-muted); display: inline-block; padding: 0.3em 0.9em; border-radius: 999px; border: 1.5px solid var(--hz-if-c); background: color-mix(in srgb, var(--hz-if-c) 14%, transparent); animation: hz-if-flow-pop 380ms ease-out; }
 .md-typeset .hz-if-flow-badge code { background: none; padding: 0; color: var(--hz-if-c); font-weight: 700; font-size: 0.8rem; }
-.md-typeset .hz-if-flow-badge.is-at-risk { --hz-if-c: var(--hz-bad); }
+.md-typeset .hz-if-flow-badge.is-high { --hz-if-c: var(--hz-bad); }
 .md-typeset .hz-if-flow-badge.is-watch { --hz-if-c: var(--hz-a); }
-.md-typeset .hz-if-flow-badge.is-ok { --hz-if-c: var(--hz-good); }
+.md-typeset .hz-if-flow-badge.is-low { --hz-if-c: var(--hz-good); }
 .md-typeset .hz-if-flow-code {
   margin: 0; padding: 0.5em 0; border-radius: 8px; font-family: var(--md-code-font); font-size: 0.7rem; line-height: 1.6;
   background: var(--md-default-bg-color); border: 1px solid var(--hz-line); color: var(--md-default-fg-color); overflow-x: auto;

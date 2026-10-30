@@ -1,18 +1,20 @@
 /*
- * groupby: split -> apply -> combine for data.groupby(['stock'])['price'].agg().
- * Rows physically move into their groups, each group collapses to one number,
- * and the numbers stack into the result Series.
+ * groupby: split -> apply -> combine for df.groupby("hotel")["adr"].mean(),
+ * on nine real Altamar bookings. Rows physically move into their hotel's
+ * group, each group collapses to one number, and the numbers stack into the
+ * result Series: bookings -> hotels -> average rate.
  */
 (function () {
   const { el, svg } = HZ;
 
+  // [hotel, adr] of nine bookings from altamar_bookings_clean.csv
   const ROWS = [
-    ["AAPL", 189.3], ["AMZN", 178.2], ["GOOGL", 141.8], ["AAPL", 192.45], ["AMZN", 182.65],
-    ["AAPL", 187.8], ["GOOGL", 139.25], ["AMZN", 176.9], ["AAPL", 191.05],
+    ["Viña del Mar", 133.13], ["Santiago", 115.22], ["Puerto Varas", 135.23], ["Santiago", 88.8], ["Viña del Mar", 167.26],
+    ["Santiago", 91.02], ["Puerto Varas", 173.75], ["Viña del Mar", 128.16], ["Santiago", 119.61],
   ];
-  const KEYS = ["AAPL", "AMZN", "GOOGL"]; // groupby sorts the keys
-  const COLORS = ["var(--hz-a)", "var(--hz-b)", "var(--hz-gb-c)"];
-  const SOFTS = ["var(--hz-a-soft)", "var(--hz-b-soft)", "var(--hz-gb-c-soft)"];
+  const KEYS = ["Puerto Varas", "Santiago", "Viña del Mar"]; // groupby sorts the keys
+  const COLORS = ["var(--hz-gb-c)", "var(--hz-b)", "var(--hz-a)"];
+  const SOFTS = ["var(--hz-gb-c-soft)", "var(--hz-b-soft)", "var(--hz-a-soft)"];
   const groupOf = ROWS.map(([k]) => KEYS.indexOf(k));
   const members = KEYS.map((_, g) => ROWS.map((_, i) => i).filter((i) => groupOf[i] === g));
   const slotOf = ROWS.map((_, i) => members[groupOf[i]].indexOf(i));
@@ -23,7 +25,6 @@
       const s = [...xs].sort((a, b) => a - b), m = s.length >> 1;
       return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
     },
-    sum: (xs) => xs.reduce((a, b) => a + b, 0),
     count: (xs) => xs.length,
     max: (xs) => Math.max(...xs),
   };
@@ -32,17 +33,16 @@
   function formula(agg, xs) {
     const list = xs.map(p2);
     if (agg === "mean") return "(" + list.join(" + ") + ") / " + xs.length;
-    if (agg === "sum") return list.join(" + ");
     if (agg === "count") return xs.length + " rows";
     if (agg === "max") return "max(" + list.join(", ") + ")";
     const s = [...xs].sort((a, b) => a - b).map(p2);
     return "middle of " + s.join(", ") + (xs.length % 2 ? "" : " → average of the two middle values");
   }
 
-  // pandas: floats get 6 decimals, then trailing zeros are trimmed in step across the column
+  // .round(2), then pandas: floats get 6 decimals, trailing zeros trimmed in step across the column
   function pandasFormat(values, agg) {
     if (agg === "count") return values.map(String);
-    let s = values.map((v) => v.toFixed(6));
+    let s = values.map((v) => (Math.round(v * 100) / 100).toFixed(6));
     while (s.every((x) => x.endsWith("0") && !x.endsWith(".0"))) s = s.map((x) => x.slice(0, -1));
     return s;
   }
@@ -56,7 +56,7 @@
 
   HZ.register("groupby", {
     title: "Split → apply → combine",
-    kicker: "Session 2",
+    kicker: "Week 2",
     mount(body) {
       body.classList.add("hz-groupby");
       let agg = "mean";
@@ -66,11 +66,12 @@
 
       body.append(el("p", { class: "hz-x__lede" }, [
         el("code", { text: "groupby" }),
-        " answers questions like “what is the average price of each stock?” in three moves. Press Play, or Step through it.",
+        " answers questions like “what is the average nightly rate at each hotel?” in three moves. Nine real bookings: press Play, or Step through it.",
       ]));
 
       const codeAgg = el("span", { class: "hz-groupby-agg", text: "mean" });
-      const codeLine = el("pre", { class: "hz-list-index-def hz-groupby-code" }, ["data.groupby(['stock'])['price'].", codeAgg, "()"]);
+      const codeRound = el("span", { text: ".round(2)" });
+      const codeLine = el("pre", { class: "hz-groupby-code" }, ['df.groupby("hotel")["adr"].', codeAgg, "()", codeRound]);
 
       const seg = HZ.segmented(Object.keys(AGGS).map((k) => ({ value: k, label: k })), agg, (v) => setAgg(v));
       seg.node.setAttribute("aria-label", "Aggregation");
@@ -82,42 +83,45 @@
       const pills = STAGES.slice(1).map((s) => el("span", { class: "hz-groupby-pill" }, [el("b", { text: s.tag }), s.name]));
       const pillRow = el("div", { class: "hz-groupby-pills", "aria-hidden": "true" }, pills);
 
-      const fig = svg("svg", { class: "hz-groupby-fig", role: "img", "aria-label": "Table of 9 stock prices being grouped by stock" });
+      const fig = svg("svg", { class: "hz-groupby-fig", role: "img", "aria-label": "Table of 9 bookings being grouped by hotel" });
       const note = el("p", { class: "hz-x__note", "aria-live": "polite" });
       body.append(codeLine, controls, pillRow, fig, note);
 
       // --- Layout (pixel units, recomputed on resize so text stays readable at any width)
       const RH = 24, LBL = 20;
       let Lyt = null;
+      // Wide: three columns side by side. Narrow: data, groups and result stacked.
       function layout(width) {
         const w = Math.max(280, width);
-        const wide = w >= 560;
-        const gut = wide ? 28 : 12;
-        const colW = wide ? (w - 2 * gut) / 3 : (w - gut) / 2;
+        const wide = w >= 600;
+        const gut = 28;
+        const colW = wide ? (w - 2 * gut) / 3 : Math.min(w, 360);
         const top = 22;
         const table = { x: 0, y: top, w: colW };
-        const groups = { x: colW + gut, y: top, w: colW };
+        const tableTop = top + RH * (ROWS.length + 1);
+        const groups = { x: wide ? colW + gut : 0, y: wide ? top : tableTop + 42, w: colW };
+        const KW = wide ? Math.min(100, colW - 80) : 100;
         // group block tops
         const blocks = [];
-        let y = top;
+        let y = groups.y;
         KEYS.forEach((_, g) => {
           blocks.push({ y, h: LBL + members[g].length * RH + 6 });
           y += LBL + members[g].length * RH + 14;
         });
         const groupsBottom = y - 14;
-        const tableBottom = top + RH * (ROWS.length + 1);
+        const tableBottom = tableTop;
         let result;
         if (wide) result = { x: 2 * (colW + gut), y: top, w: colW };
-        else result = { x: Math.max(0, (w - Math.min(w, 260)) / 2), y: Math.max(groupsBottom, tableBottom) + 40, w: Math.min(w, 260) };
+        else result = { x: 0, y: groupsBottom + 42, w: colW };
         const h = wide ? Math.max(groupsBottom, tableBottom) + 8 : result.y + RH * 5 + 4;
-        return { w, h, wide, table, groups, result, blocks };
+        return { w, h, wide, table, groups, result, blocks, KW };
       }
 
       // --- Scene
       const titles = ["data", "groups", "result"].map((t) => svg("text", { class: "hz-groupby-coltitle", text: t }));
       const tableHead = svg("g", { class: "hz-groupby-head" }, [
-        svg("text", { class: "hz-groupby-hstock", text: "stock" }),
-        svg("text", { class: "hz-groupby-hprice", "text-anchor": "end", text: "price" }),
+        svg("text", { class: "hz-groupby-hstock", text: "hotel" }),
+        svg("text", { class: "hz-groupby-hprice", "text-anchor": "end", text: "adr" }),
       ]);
       const ghosts = ROWS.map(([k, p], i) => makeRow(k, p, i, true));
       const blockEls = KEYS.map((k, g) =>
@@ -134,7 +138,7 @@
           svg("text", { class: "hz-groupby-cval", "text-anchor": "end", y: 4 }),
         ])
       );
-      const resHead = svg("text", { class: "hz-groupby-reshead", text: "stock" });
+      const resHead = svg("text", { class: "hz-groupby-reshead", text: "hotel" });
       const resFoot = svg("text", { class: "hz-groupby-resfoot" });
       fig.append(...titles, tableHead, ...ghosts, ...blockEls, ...rowEls, ...chips, resHead, resFoot);
 
@@ -196,7 +200,11 @@
         tableHead.children[0].setAttribute("x", 18);
         tableHead.children[1].setAttribute("x", L.table.w - 12);
         const priceX = (w) => w - 12;
-        ghosts.concat(rowEls).forEach((r) => r.children[3].setAttribute("x", priceX(L.table.w)));
+        ghosts.concat(rowEls).forEach((r) => {
+          r.children[1].setAttribute("width", L.KW);
+          r.children[2].setAttribute("x", 18 + L.KW / 2);
+          r.children[3].setAttribute("x", priceX(L.table.w));
+        });
         ghosts.forEach((gh, i) => setG(gh, tablePos(i)));
         blockEls.forEach((b, g) => {
           b.children[0].setAttribute("x", L.groups.x);
@@ -265,28 +273,32 @@
       function updateValues() {
         const vs = pandasFormat(values(), agg);
         chips.forEach((c, g) => (c.children[2].textContent = vs[g]));
-        resFoot.textContent = "Name: price, dtype: " + (agg === "count" ? "int64" : "float64");
+        resFoot.textContent = "Name: adr, dtype: " + (agg === "count" ? "int64" : "float64");
         codeAgg.textContent = agg;
+        codeRound.style.display = agg === "count" ? "none" : "";
         blockEls.forEach((b, g) => {
           const n = members[g].length;
-          b.children[1].textContent = KEYS[g] + " · " + (stage >= 2 ? agg + (Lyt && Lyt.wide ? " of " + n + " rows" : "") : n + " rows");
+          b.children[1].textContent = KEYS[g] + " · " + (stage >= 2 ? agg : n + (n === 1 ? " row" : " rows"));
         });
       }
 
       function caption() {
         const c = (s) => el("code", { text: s });
         if (stage === 0)
-          return ["data has ", ROWS.length, " rows and three different stocks. Each colour is one stock."];
+          return [ROWS.length, " bookings at three hotels; each colour is one hotel. A manager does not want nine rates, she wants one number per hotel."];
         if (stage === 1)
-          return [el("b", { text: "Split: " }), "rows with the same ", c("stock"), " go into the same group, keeping their original index. 3 stocks → 3 groups. Nothing is computed yet."];
+          return [el("b", { text: "Split: " }), "bookings with the same ", c("hotel"), " go into the same group, keeping their original index. 3 hotels → 3 groups. Nothing is computed yet."];
         if (stage === 2) {
           const vs = pandasFormat(values(), agg);
           const lines = KEYS.map((k, g) => el("span", { class: "hz-groupby-calc" }, [
             el("b", { text: k + ": " }), formula(agg, members[g].map((i) => ROWS[i][1])), " = ", vs[g],
           ]));
-          return [el("b", { text: "Apply: " }), c("." + agg + "()"), " runs separately inside each group, on the ", c("price"), " column only:", ...lines];
+          return [el("b", { text: "Apply: " }), c("." + agg + "()"), " runs separately inside each group, on the ", c("adr"), " column only:", ...lines];
         }
-        return [el("b", { text: "Combine: " }), "the three answers are glued into a new Series. The group keys become its index (named ", c("stock"), ", sorted A→Z) and the column you picked gives its name, ", c("price"), "."];
+        const story = agg === "mean" || agg === "median"
+          ? [" Santiago, the business hotel, is the cheapest here; the full file agrees (99 USD against 140 at Viña del Mar and 156 at Puerto Varas)."]
+          : agg === "count" ? [" Counting rows tells you how much evidence sits behind each number: never trust an average of two bookings."] : [];
+        return [el("b", { text: "Combine: " }), "the three answers are glued into a small table (a Series). The hotel names become its index, sorted A→Z, and the column you picked gives its name, ", c("adr"), ".", ...story];
       }
 
       function syncUi() {
@@ -391,5 +403,13 @@
         ro.observe(body);
       }
     },
+    // SVG text at 12 px or more; the rest of the styles live in interactive.css
+    css: `
+.md-typeset .hz-x svg .hz-groupby-coltitle, .md-typeset .hz-x svg .hz-groupby-head text, .md-typeset .hz-x svg .hz-groupby-idx,
+.md-typeset .hz-x svg .hz-groupby-keytxt, .md-typeset .hz-x svg .hz-groupby-blabel, .md-typeset .hz-x svg .hz-groupby-ckey,
+.md-typeset .hz-x svg .hz-groupby-reshead, .md-typeset .hz-x svg .hz-groupby-resfoot { font-size: 12px; }
+.md-typeset .hz-x svg .hz-groupby-price, .md-typeset .hz-x svg .hz-groupby-cval { font-size: 12.5px; }
+.md-typeset .hz-groupby-code { margin: 0; padding: 0.5em 0.8em; border-radius: 8px; font-family: var(--md-code-font); font-size: 0.66rem; background: var(--md-default-bg-color); border: 1px solid var(--hz-line); white-space: pre-wrap; overflow-wrap: anywhere; }
+`,
   });
 })();

@@ -1,5 +1,5 @@
 /*
- * df-anatomy: the parts of a pandas DataFrame on five Cordillera customers.
+ * df-anatomy: the parts of a pandas DataFrame on five real Altamar bookings.
  * Hover or click a part (index, a column, a row, the values, the dtypes, the
  * shape) and it lights up in the table, with the pandas code that returns it
  * and what pandas prints.
@@ -7,14 +7,15 @@
 (function () {
   const { el } = HZ;
 
-  const COLS = ["plan", "age", "monthly_bill", "churned"];
+  // The first five rows of altamar_bookings.csv, four of its twenty columns
+  const COLS = ["hotel", "nights", "adr", "canceled"];
   const DTYPES = ["object", "int64", "float64", "int64"];
   const ROWS = [
-    ["Basic", "34", "25.46", "0"],
-    ["Plus", "31", "37.05", "1"],
-    ["Prepaid", "38", "11.43", "0"],
-    ["Unlimited", "31", "40.97", "0"],
-    ["Basic", "34", "19.18", "1"],
+    ["Viña del Mar", "3", "202.58", "1"],
+    ["Santiago", "2", "115.22", "1"],
+    ["Viña del Mar", "5", "68.57", "0"],
+    ["Viña del Mar", "6", "133.13", "0"],
+    ["Puerto Varas", "3", "113.35", "0"],
   ];
 
   // pandas prints a Series as: labels padded to the longest, values right-aligned in (longest + 4)
@@ -35,14 +36,14 @@
       return {
         code: "df.index",
         out: "RangeIndex(start=0, stop=5, step=1)",
-        cap: [el("b", { text: "Index: " }), "the labels of the rows. ", c("read_csv"), " numbers them 0, 1, 2… unless you choose a column, like ", c("customer_id"), ". It labels rows; it is not data."],
+        cap: [el("b", { text: "Index: " }), "the labels of the rows. ", c("read_csv"), " numbers them 0, 1, 2… unless you choose a column, like ", c("booking_id"), ". It labels the bookings; it is not data."],
       };
     if (kind === "column") {
       const j = arg;
       return {
         code: 'df["' + COLS[j] + '"]',
         out: seriesRepr(ROWS.map((_, i) => String(i)), ROWS.map((r) => r[j]), COLS[j], DTYPES[j]),
-        cap: [el("b", { text: "A column is a Series: " }), "one variable for every customer, with the index still attached. One column has one dtype, here ", c(DTYPES[j]), ". Click another header."],
+        cap: [el("b", { text: "A column is a Series: " }), "one fact for every booking, with the index still attached. One column has one type, here ", c(DTYPES[j]), ". Click another header."],
       };
     }
     if (kind === "row") {
@@ -50,25 +51,25 @@
       return {
         code: "df.loc[" + i + "]",
         out: seriesRepr(COLS, ROWS[i], String(i), "object"),
-        cap: [el("b", { text: "A row is one customer: " }), "pandas hands it back as a Series too, labelled by the column names. It mixes text and numbers, so its dtype is ", c("object"), ". Click another row label."],
+        cap: [el("b", { text: "A row is one booking: " }), "pandas hands it back as a Series too, labelled by the column names. It mixes text and numbers, so its type is ", c("object"), ". Click another row label."],
       };
     }
     if (kind === "values")
       return {
         code: "df.to_numpy()",
         out: npValues(),
-        cap: [el("b", { text: "Values: " }), "the data itself, a grid like the NumPy arrays of session 1. Index and column names are the labels around it."],
+        cap: [el("b", { text: "Values: " }), "the data itself, a grid of facts. The index and the column names are the labels around it."],
       };
     if (kind === "dtypes")
       return {
         code: "df.dtypes",
         out: seriesRepr(COLS, DTYPES, "", "object").replace(/\nName: , dtype: object$/, "\ndtype: object"),
-        cap: [el("b", { text: "dtypes: " }), c("object"), " is text, ", c("int64"), " whole numbers, ", c("float64"), " decimals. A bill stored as ", c("object"), " would be a red flag: something non-numeric is hiding in it."],
+        cap: [el("b", { text: "Types: " }), c("object"), " is text, ", c("int64"), " whole numbers, ", c("float64"), " decimals. A rate stored as ", c("object"), " would be a red flag: something that is not a number is hiding in it."],
       };
     return {
       code: "df.shape",
       out: "(5, 4)",
-      cap: [el("b", { text: "Shape: " }), "(rows, columns). The index is not counted as a column. The full customer file is ", c("(5075, 15)"), "."],
+      cap: [el("b", { text: "Shape: " }), "(rows, columns). The index is not counted as a column. The full raw file is ", c("(6060, 20)"), ": 6,060 bookings, 20 facts about each."],
     };
   }
 
@@ -82,16 +83,16 @@
   ];
 
   HZ.register("df-anatomy", {
-    kicker: "Session 2",
-    title: "Anatomy of a DataFrame",
+    kicker: "Week 2",
+    title: "Anatomy of a table",
     mount(body) {
       body.classList.add("hz-df-anatomy");
       let locked = { kind: "column", arg: 2 };
       let lastCol = 2, lastRow = 2;
 
       body.append(el("p", { class: "hz-x__lede" }, [
-        "Five Cordillera customers in a DataFrame called ", el("code", { text: "df" }),
-        ". Hover or tap a part to see where it lives and what pandas gives you back. Column headers and row labels are clickable too.",
+        "Five Altamar bookings in a table (a DataFrame) called ", el("code", { text: "df" }),
+        ". One row is one booking, one column is one fact about it. Hover or tap a part to see where it lives and what pandas gives you back.",
       ]));
 
       const chips = PARTS.map((p) =>
@@ -221,6 +222,7 @@
   .md-typeset table.hz-df-anatomy-table { width: 100%; }
   .md-typeset .hz-df-anatomy-wrap { flex-basis: 100%; }
   .md-typeset .hz-df-anatomy-table thead th { white-space: normal; vertical-align: bottom; }
+  .md-typeset .hz-df-anatomy-table td.is-text { white-space: normal; text-align: left; min-width: 4.2em; }
 }
 `,
   });

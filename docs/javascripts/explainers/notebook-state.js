@@ -2,7 +2,7 @@
  * notebook-state: a notebook is code plus a memory (the kernel).
  * Three Colab-like cells and a "Kernel memory" panel. The student runs the
  * cells in any order, restarts, or deletes cell 1, and sees that memory keeps
- * results, not cells: running cell 2 twice raises the price twice, running a
+ * results, not cells: running cell 2 twice raises the rate twice, running a
  * cell before cell 1 is a NameError, and a deleted cell's variables survive
  * until the next restart.
  */
@@ -10,11 +10,12 @@
   const { el, svg } = HZ;
 
   const CELLS = [
-    { id: 1, lines: ['plan = "Plus"', "monthly_bill = 31.9"] },
-    { id: 2, lines: ["# the 5% price rise", "monthly_bill = monthly_bill * 1.05"] },
-    { id: 3, lines: ["print(plan, monthly_bill)"] },
+    { id: 1, lines: ['hotel = "Santiago"', "adr = 120.5"] },
+    { id: 2, lines: ["# high season: +10 USD", "adr = adr + 10"] },
+    { id: 3, lines: ["print(hotel, adr)"] },
   ];
-  const NAMES = ["plan", "monthly_bill"];
+  const NAMES = ["hotel", "adr"];
+  const BASE = 120.5, RISE = 10;
 
   const pyRepr = (v) => (typeof v === "string" ? "'" + v + "'" : String(v));
   const pyType = (v) => (typeof v === "string" ? "str" : Number.isInteger(v) ? "int" : "float");
@@ -50,7 +51,7 @@
     let mem = new Map();
     let count = 0;
     let order = [];
-    let rises = 0; // times cell 2 applied the rise since cell 1 last set the bill
+    let rises = 0; // times cell 2 applied the rise since cell 1 last set the rate
     let deleted = false;
     let busy = false;
     let runId = 0;
@@ -194,7 +195,7 @@
         const lines = v.code.querySelectorAll(".hz-notebook-state-line");
         const hadBoth = NAMES.every((n) => mem.has(n));
         const anims = [];
-        [["plan", "Plus", lines[0]], ["monthly_bill", 31.9, lines[1]]].forEach(([n, val, line], k) => {
+        [["hotel", "Santiago", lines[0]], ["adr", BASE, lines[1]]].forEach(([n, val, line], k) => {
           if (rows.has(n)) setValue(n, val);
           else {
             mem.set(n, val);
@@ -203,27 +204,27 @@
         });
         await Promise.all(anims);
         rises = 0;
-        if (hadBoth && prevRises > 0) return { ok: true, msg: "Running cell 1 again put <code>monthly_bill</code> back to 31.9. Re-running a cell overwrites what memory held." };
+        if (hadBoth && prevRises > 0) return { ok: true, msg: "Running cell 1 again put <code>adr</code> back to " + pyRepr(BASE) + ". Re-running a cell overwrites what memory held." };
         if (hadBoth) return { ok: true, msg: "Cell 1 ran again and wrote the same two values over the old ones." };
-        return { ok: true, msg: "Cell 1 created two variables: the labels <code>plan</code> and <code>monthly_bill</code> now live in memory, and any later cell can read them." };
+        return { ok: true, msg: "Cell 1 created two variables: the labels <code>hotel</code> and <code>adr</code> now live in memory, and any later cell can read them." };
       }
 
       if (cellId === 2) {
-        if (!mem.has("monthly_bill")) return nameError(v, "monthly_bill", 2);
-        const old = mem.get("monthly_bill");
-        setValue("monthly_bill", old * 1.05);
+        if (!mem.has("adr")) return nameError(v, "adr", 2);
+        const old = mem.get("adr");
+        setValue("adr", old + RISE);
         rises++;
-        if (rises === 1) return { ok: true, msg: "Cell 2 read <code>monthly_bill</code> from memory (" + pyRepr(old) + ") and replaced it with " + pyRepr(mem.get("monthly_bill")) + ". Nothing on screen shows the old value any more." };
-        return { ok: true, msg: "Cell 2 has run " + rises + " times since cell 1, so the price rose " + rises + " times: now " + pyRepr(mem.get("monthly_bill")) + ". Memory remembers results, not cells." };
+        if (rises === 1) return { ok: true, msg: "Cell 2 read <code>adr</code> from memory (" + pyRepr(old) + ") and replaced it with " + pyRepr(mem.get("adr")) + ". Nothing on screen shows the old rate any more." };
+        return { ok: true, msg: "Cell 2 has run " + rises + " times since cell 1, so the rate rose " + rises + " times: now " + pyRepr(mem.get("adr")) + ". Memory remembers results, not cells." };
       }
 
       // cell 3
-      if (!mem.has("plan")) return nameError(v, "plan", 3);
-      if (!mem.has("monthly_bill")) return nameError(v, "monthly_bill", 3);
-      writeOut(v, mem.get("plan") + " " + pyRepr(mem.get("monthly_bill")));
-      if (rises === 0) return { ok: true, msg: "Cell 3 printed the bill <em>without</em> the rise: cell 2 has not run since cell 1. The output depends on what ran, not on what is written." };
-      if (rises === 1) return { ok: true, msg: "Cell 3 printed what memory holds right now: the Plus bill after one 5% rise." };
-      return { ok: true, msg: "Cell 3 prints " + pyRepr(mem.get("monthly_bill")) + ", not 33.495: the rise was applied " + rises + " times. Nothing in the code is wrong; the order was." };
+      if (!mem.has("hotel")) return nameError(v, "hotel", 3);
+      if (!mem.has("adr")) return nameError(v, "adr", 3);
+      writeOut(v, mem.get("hotel") + " " + pyRepr(mem.get("adr")));
+      if (rises === 0) return { ok: true, msg: "Cell 3 printed the rate <em>without</em> the rise: cell 2 has not run since cell 1. The output depends on what ran, not on what is written." };
+      if (rises === 1) return { ok: true, msg: "Cell 3 printed what memory holds right now: the Santiago rate after one high-season rise of 10 USD." };
+      return { ok: true, msg: "Cell 3 prints " + pyRepr(mem.get("adr")) + ", not " + pyRepr(BASE + RISE) + ": the rise was applied " + rises + " times. Nothing in the code is wrong; the order was. Imagine this rate going into tomorrow's price list." };
     }
 
     function nameError(v, name, cellId) {
@@ -260,7 +261,7 @@
       note.innerHTML = r.ok
         ? (deleted
           ? "It still ran, because memory still had the variables from the deleted cell. Restart first to see the truth."
-          : "Run all ran every cell once, top to bottom: the order a teammate or your grader gets. The bill rose exactly once.")
+          : "Run all ran every cell once, top to bottom: the order a teammate or your grader gets. The rate rose exactly once.")
         : r.msg + (deleted ? "" : "");
       setBusy(false);
     }
@@ -309,8 +310,8 @@
           if (deleted) c1.hidden = true;
         });
         note.innerHTML = mem.size
-          ? "Cell 1 is gone, but <code>plan</code> and <code>monthly_bill</code> still live in memory, so cells 2 and 3 keep working. Click <em>Restart</em>, then <em>Run all</em>, to see what a teammate would see."
-          : "Cell 1 is gone. Now no cell creates <code>plan</code> or <code>monthly_bill</code>. Try <em>Run all</em>.";
+          ? "Cell 1 is gone, but <code>hotel</code> and <code>adr</code> still live in memory, so cells 2 and 3 keep working. Click <em>Restart</em>, then <em>Run all</em>, to see what a teammate would see."
+          : "Cell 1 is gone. Now no cell creates <code>hotel</code> or <code>adr</code>. Try <em>Run all</em>.";
       } else {
         c1.hidden = false;
         void c1.offsetWidth;
@@ -325,12 +326,12 @@
   }
 
   HZ.register("notebook-state", {
-    kicker: "Session 1",
+    kicker: "Week 1",
     title: "Cells run in the order you click them",
     mount,
     css: `
 .md-typeset .hz-notebook-state-stage { position: relative; }
-.md-typeset .hz-notebook-state-split { grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); }
+.md-typeset .hz-notebook-state-split { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
 @media (max-width: 52em) { .md-typeset .hz-notebook-state-split { grid-template-columns: minmax(0, 1fr); } }
 .md-typeset .hz-notebook-state-nb { display: flex; flex-direction: column; gap: 0.55rem; min-width: 0; }
 .md-typeset .hz-notebook-state-cell {
@@ -401,7 +402,7 @@
   .md-typeset .hz-notebook-state-row > :last-child { grid-column: 3; justify-self: start; }
   .md-typeset .hz-notebook-state-val { overflow-wrap: normal; white-space: nowrap; }
 }
-.md-typeset .hz-notebook-state-val { font-family: var(--md-code-font); font-size: 0.72rem; font-variant-numeric: tabular-nums; color: var(--md-default-fg-color); overflow-wrap: anywhere; }
+.md-typeset .hz-notebook-state-val { font-family: var(--md-code-font); font-size: 0.72rem; font-variant-numeric: tabular-nums; color: var(--md-default-fg-color); white-space: nowrap; }
 .md-typeset .hz-notebook-state-was { font-family: var(--md-code-font); font-size: 0.58rem; color: var(--hz-muted); text-decoration: line-through; }
 .md-typeset .hz-notebook-state-was:empty { display: none; }
 .md-typeset .hz-notebook-state-badge {

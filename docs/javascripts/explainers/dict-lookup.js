@@ -1,6 +1,6 @@
 /*
- * dict-lookup: a Python dict as key cards and value cards (Session 1).
- * The student types customer["plan"], customer.get(...), an assignment...
+ * dict-lookup: a Python dict as key cards and value cards (Week 1: one Altamar booking).
+ * The student types booking["hotel"], booking.get(...), an assignment...
  * The key is hashed, a pointer jumps straight to its card (no scanning),
  * the link to the value lights up and the value pops. A missing key shows
  * KeyError, while .get() hands back a dashed default card instead.
@@ -10,24 +10,24 @@
 
   const S = (v) => ({ t: "str", v });
   const ORIGINAL = [
-    ["customer_id", S("CM-10482")],
-    ["plan", S("Plus")],
-    ["contract", S("Month-to-month")],
-    ["monthly_bill", { t: "float", v: 31.9 }],
-    ["tenure_months", { t: "int", v: 14 }],
-    ["support_tickets", { t: "int", v: 2 }],
-    ["autopay", { t: "bool", v: true }],
+    ["booking_id", S("AH-200974")],
+    ["hotel", S("Viña del Mar")],
+    ["channel", S("Online travel agency")],
+    ["lead_time_days", { t: "int", v: 92 }],
+    ["nights", { t: "int", v: 3 }],
+    ["adr", { t: "float", v: 202.58 }],
+    ["canceled", { t: "bool", v: true }],
   ];
   const PRESETS = [
-    'customer["plan"]',
-    'customer["monthly_bill"]',
-    'customer["region"]',
-    'customer.get("region", "Unknown")',
-    'customer.get("plan", "Unknown")',
-    'customer["support_tickets"] = 3',
-    'customer["region"] = "Norte"',
-    "customer.keys()",
-    "len(customer)",
+    'booking["hotel"]',
+    'booking["adr"]',
+    'booking["country"]',
+    'booking.get("country", "Unknown")',
+    'booking.get("hotel", "Unknown")',
+    'booking["nights"] = 4',
+    'booking["parking"] = True',
+    "booking.keys()",
+    "len(booking)",
   ];
 
   // ---------- Python-ish values
@@ -74,27 +74,27 @@
     return out.map((a) => a.trim());
   }
 
-  const SYNTAX = { error: "SyntaxError: invalid syntax", hint: 'Try customer["plan"] or customer.get("region", "Unknown").' };
+  const SYNTAX = { error: "SyntaxError: invalid syntax", hint: 'Try booking["hotel"] or booking.get("country", "Unknown").' };
 
   // Turn the inside of [...] or a .get() argument into a key, or an error.
   function keyOf(src) {
-    if (!src.trim()) return { err: { error: "SyntaxError: invalid syntax", hint: "Put a key inside the brackets, in quotes: customer[\"plan\"]." } };
+    if (!src.trim()) return { err: { error: "SyntaxError: invalid syntax", hint: "Put a key inside the brackets, in quotes: booking[\"hotel\"]." } };
     const k = literal(src);
     if (!k) return { err: SYNTAX };
     if (k.name)
-      return { err: { error: "NameError: name '" + k.name + "' is not defined", hint: "Keys are text, so they need quotes: customer[\"" + k.name + "\"]. Without quotes Python looks for a variable called " + k.name + "." } };
+      return { err: { error: "NameError: name '" + k.name + "' is not defined", hint: "Keys are text, so they need quotes: booking[\"" + k.name + "\"]. Without quotes Python looks for a variable called " + k.name + "." } };
     return { key: k };
   }
 
   function parse(raw) {
     const src = raw.trim();
     let m;
-    if (src === "customer") return { kind: "all" };
-    if (/^len\s*\(\s*customer\s*\)$/.test(src)) return { kind: "len" };
-    if ((m = src.match(/^customer\s*\.\s*(keys|values|items)\s*\(\s*\)$/))) return { kind: m[1] };
-    if ((m = src.match(/^customer\s*\.\s*get\s*\(([\s\S]*)\)$/))) {
+    if (src === "booking") return { kind: "all" };
+    if (/^len\s*\(\s*booking\s*\)$/.test(src)) return { kind: "len" };
+    if ((m = src.match(/^booking\s*\.\s*(keys|values|items)\s*\(\s*\)$/))) return { kind: m[1] };
+    if ((m = src.match(/^booking\s*\.\s*get\s*\(([\s\S]*)\)$/))) {
       const args = splitArgs(m[1]);
-      if (args.length > 2 || !args[0]) return { error: "TypeError: get expected 1 or 2 arguments", hint: "customer.get(key) or customer.get(key, default)." };
+      if (args.length > 2 || !args[0]) return { error: "TypeError: get expected 1 or 2 arguments", hint: "booking.get(key) or booking.get(key, default)." };
       const k = keyOf(args[0]);
       if (k.err) return k.err;
       let dflt = null;
@@ -104,7 +104,7 @@
       }
       return { kind: "get", key: k.key, dflt };
     }
-    if ((m = src.match(/^customer\s*\[([\s\S]*)\]\s*=(?!=)\s*([\s\S]+)$/))) {
+    if ((m = src.match(/^booking\s*\[([\s\S]*)\]\s*=(?!=)\s*([\s\S]+)$/))) {
       const k = keyOf(m[1]);
       if (k.err) return k.err;
       const v = literal(m[2]);
@@ -112,18 +112,18 @@
       if (v.name) return { error: "NameError: name '" + v.name + "' is not defined", hint: "Text values need quotes: \"" + v.name + "\"." };
       return { kind: "set", key: k.key, val: v };
     }
-    if ((m = src.match(/^customer\s*\[([\s\S]*)\]$/))) {
+    if ((m = src.match(/^booking\s*\[([\s\S]*)\]$/))) {
       const k = keyOf(m[1]);
       return k.err ? k.err : { kind: "item", key: k.key };
     }
-    if ((m = src.match(/^([\s\S]+?)\s+(not\s+in|in)\s+customer$/))) {
+    if ((m = src.match(/^([\s\S]+?)\s+(not\s+in|in)\s+booking$/))) {
       const k = keyOf(m[1]);
       return k.err ? k.err : { kind: "in", key: k.key, neg: /^not/.test(m[2]) };
     }
-    if ((m = src.match(/^customer\s*\.\s*([A-Za-z_]\w*)$/)))
-      return { error: "AttributeError: 'dict' object has no attribute '" + m[1] + "'", hint: "Dict values are reached with brackets and a quoted key: customer[\"" + m[1] + "\"]." };
-    if ((m = src.match(/^([A-Za-z_]\w*)\s*[\[.(]/)) && m[1] !== "customer" && m[1] !== "len")
-      return { error: "NameError: name '" + m[1] + "' is not defined", hint: "The dict is called customer." };
+    if ((m = src.match(/^booking\s*\.\s*([A-Za-z_]\w*)$/)))
+      return { error: "AttributeError: 'dict' object has no attribute '" + m[1] + "'", hint: "Dict values are reached with brackets and a quoted key: booking[\"" + m[1] + "\"]." };
+    if ((m = src.match(/^([A-Za-z_]\w*)\s*[\[.(]/)) && m[1] !== "booking" && m[1] !== "len")
+      return { error: "NameError: name '" + m[1] + "' is not defined", hint: "The dict is called booking." };
     return SYNTAX;
   }
 
@@ -140,7 +140,7 @@
         "A dictionary stores each value under a ",
         el("strong", { text: "key" }),
         ". You don't ask for position 3, you ask for ",
-        el("code", { text: '"plan"' }),
+        el("code", { text: '"hotel"' }),
         ". Type an expression or pick one below.",
       ])
     );
@@ -150,8 +150,8 @@
     const list = el("div", { class: "hz-dict-lookup-rows" });
     const table = el("div", { class: "hz-dict-lookup-table" }, [ptr, list]);
     const countBadge = el("span", { class: "hz-dict-lookup-badge is-dict" });
-    const fig = el("div", { class: "hz-dict-lookup-fig", role: "img", "aria-label": "The customer dictionary as key cards linked to value cards" }, [
-      el("div", { class: "hz-dict-lookup-title" }, [el("code", { text: "customer" }), countBadge, probe]),
+    const fig = el("div", { class: "hz-dict-lookup-fig", role: "img", "aria-label": "The booking dictionary as key cards linked to value cards" }, [
+      el("div", { class: "hz-dict-lookup-title" }, [el("code", { text: "booking" }), countBadge, probe]),
       el("div", { class: "hz-dict-lookup-head" }, [el("span", { text: "keys" }), el("span"), el("span", { text: "values" })]),
       table,
     ]);
@@ -220,7 +220,7 @@
       dict = ORIGINAL.map(([k, v]) => [S(k), { ...v }]);
       renderAll();
       clearMarks();
-      out.replaceChildren(el("span", { class: "hz-list-index-echo", text: "# customer is back to its original 7 keys" }));
+      out.replaceChildren(el("span", { class: "hz-list-index-echo", text: "# booking is back to its original 7 keys" }));
       note.textContent = "The dictionary is back to how the notebook defines it.";
     }
 
@@ -297,7 +297,7 @@
       if (r.kind === "len") {
         rows.forEach((x) => x.row.classList.add("is-on"));
         writeOut(ex, String(dict.length));
-        note.textContent = "len() counts the key–value pairs. One customer record, " + dict.length + " fields.";
+        note.textContent = "len() counts the key–value pairs. One booking, " + dict.length + " fields.";
         return;
       }
 
@@ -359,7 +359,7 @@
           if (!alive()) return;
           x.row.classList.add("is-on");
           writeOut(ex, "# nothing printed: a new key was added", "hz-list-index-echo");
-          note.textContent = "There was no key " + repr(r.key) + ", so assignment created a new key–value pair. Now customer has " + dict.length + " keys. Use Reset dict to go back.";
+          note.textContent = "There was no key " + repr(r.key) + ", so assignment created a new key–value pair. Now booking has " + dict.length + " keys. Use Reset dict to go back.";
         }
         return;
       }
@@ -395,7 +395,7 @@
         shake();
         writeOut(ex, "KeyError: " + repr(r.key), "hz-list-index-err");
         note.textContent = "A dict only knows the keys it was given, and " + repr(r.key) + " is not one of them. " + missHint(r.key) +
-          (similar(r.key) ? "" : "If a field may be missing, ask with customer.get(" + repr(r.key).replace(/'/g, '"') + ', "Unknown") instead.');
+          (similar(r.key) ? "" : "If a field may be missing, ask with booking.get(" + repr(r.key).replace(/'/g, '"') + ', "Unknown") instead.');
         return;
       }
       if (!instant) await HZ.wait(260);
@@ -412,7 +412,7 @@
   }
 
   HZ.register("dict-lookup", {
-    kicker: "Session 1",
+    kicker: "Week 1",
     title: "Looking up a value by its key",
     mount,
     css: `

@@ -94,7 +94,7 @@ nav:
       - "4 · Lab: An overbooking policy": sessions/Session_4_Lab.ipynb
       - "5 · Live: When lines are not enough": sessions/Session_5_Live.ipynb
       - "5 · Lab: Tuning a tree": sessions/Session_5_Lab.ipynb
-      - "6 · Live: Forests, boosting and decisions": sessions/Session_6_Live.ipynb
+      - "6 · Live: Forests, boosting, and decisions": sessions/Session_6_Live.ipynb
       - "6 · Lab: Choosing and explaining a model": sessions/Session_6_Lab.ipynb
   - Applied case:
       - Brief and rubric: case/case.md

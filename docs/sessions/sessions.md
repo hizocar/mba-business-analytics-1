@@ -56,6 +56,19 @@ Many trees are better than one. What drives each prediction, which model to trus
 
 </div>
 
+## The story in numbers
+
+Each week's model starts from the last week's result and has to beat it on the same test bookings. This is where Altamar ends up:
+
+| | Week 3–4 · a straight line | Week 5 · a tuned tree | Week 6 · random forest | Week 6 · gradient boosting |
+|---|:--:|:--:|:--:|:--:|
+| **Nightly rate:** typical error per night | USD 20.5 | USD 13.3 | USD 10.3 | USD 8.4 |
+| **Nightly rate:** share of the variation explained (R²) | 0.74 | 0.89 | 0.94 | 0.96 |
+| **Cancellations:** how well risky bookings are ranked (AUC) | 0.74 | 0.75 | 0.77 | 0.77 |
+| **Overbooking:** cost of cancellations on the test bookings (doing nothing: USD 201,200) | USD 153,100 | — | USD 136,100 | USD 139,200 |
+
+The pattern is the lesson of the module: better inputs and nonlinear models cut the pricing error by more than half, while cancellations are harder to predict and gain less. Knowing where a model helps, and by how much, is what you present to management in week 6.
+
 ## How to use a session
 
 Every page runs **in your browser**. Press ▶ next to a cell (or ++shift+enter++) to run it; cells share their results, so run them from top to bottom. Cells marked **✏️** have settings you are invited to change: change them, run again, and see what happens. The interactive simulators respond when you drag, slide, or press play, and the *Check yourself* questions tell you right away whether you got the idea.

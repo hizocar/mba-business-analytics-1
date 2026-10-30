@@ -1,19 +1,19 @@
 /*
- * one-hot: Session 3. The text column `plan` expands into one 0/1 column per
- * plan; each row's 1 slides from its plan into the matching column. With
- * drop_first=True the reference column (Prepaid) fades out: all zeros means
- * Prepaid. Clicking a row's plan moves its 1 to the new column.
+ * one-hot: Week 3. Altamar's text column `room_type` expands into one 0/1
+ * column per room type; each booking's 1 slides from its room into the
+ * matching column. With drop_first=True the reference column (Standard) fades
+ * out: all zeros means Standard. Clicking a booking's room moves its 1.
  */
 (function () {
   const { el, svg } = HZ;
 
-  const PLANS = ["Prepaid", "Basic", "Plus", "Unlimited"]; // the order set in the notebook
-  const START = [2, 0, 3, 1, 2, 0]; // Plus, Prepaid, Unlimited, Basic, Plus, Prepaid
+  const PLANS = ["Standard", "Suite", "Superior"]; // the alphabetical order get_dummies uses
+  const START = [0, 2, 0, 1, 0, 2]; // Standard, Superior, Standard, Suite, Standard, Superior
 
   function layout(narrow) {
     return narrow
-      ? { W: 364, narrow, idxX: 10, planX: 26, planW: 86, colX: 128, colW: 56, colGap: 3, top: 50, pitch: 32, rowH: 26 }
-      : { W: 548, narrow, idxX: 14, planX: 34, planW: 112, colX: 206, colW: 80, colGap: 4, top: 50, pitch: 32, rowH: 26 };
+      ? { W: 364, narrow, idxX: 10, planX: 26, planW: 86, colX: 136, colW: 70, colGap: 4, top: 50, pitch: 32, rowH: 26 }
+      : { W: 548, narrow, idxX: 14, planX: 34, planW: 112, colX: 214, colW: 104, colGap: 6, top: 50, pitch: 32, rowH: 26 };
   }
 
   const css = `
@@ -46,8 +46,8 @@
 `;
 
   HZ.register("one-hot", {
-    kicker: "Session 3",
-    title: "One-hot encoding, one plan at a time",
+    kicker: "Week 3",
+    title: "Room types become 0/1 columns",
     css,
     mount(body) {
       body.classList.add("hz-oh", "tex2jax_ignore"); // keep MathJax away from the dollar amounts
@@ -55,7 +55,7 @@
       let L = layout(false);
 
       body.append(el("p", { class: "hz-x__lede", html:
-        "A regression multiplies numbers; it cannot multiply <code>\"Plus\"</code>. <code>pd.get_dummies</code> gives each plan its own column with a 1 if the customer has that plan and 0 otherwise. <strong>Click any plan</strong> on the left to change a customer's plan." }));
+        "A regression multiplies numbers; it cannot multiply <code>\"Suite\"</code>. <code>pd.get_dummies</code> gives each room type its own column, with a 1 if the booking is for that room and 0 otherwise. <strong>Click any room</strong> on the left to change a booking's room." }));
 
       const encodeBtn = HZ.button("Encode", () => encode(), "primary");
       const resetBtn = HZ.button("Reset", () => reset());
@@ -65,7 +65,7 @@
         (v) => setDrop(v === "true")
       );
       const code = el("pre", { class: "hz-oh-code" });
-      const fig = svg("svg", { class: "hz-oh-fig", role: "group", "aria-label": "The plan column and its one-hot encoded columns" });
+      const fig = svg("svg", { class: "hz-oh-fig", role: "group", "aria-label": "The room_type column and its 0/1 columns" });
       const note = el("p", { class: "hz-x__note", "aria-live": "polite" });
       body.append(el("div", { class: "hz-x__controls" }, [encodeBtn, dropSeg.node, resetBtn]), code, fig, note);
 
@@ -79,7 +79,7 @@
         const H = L.top + START.length * L.pitch + 26;
         fig.replaceChildren();
         fig.setAttribute("viewBox", `0 0 ${L.W} ${H}`);
-        fig.append(svg("text", { x: L.planX + L.planW / 2, y: 34, "text-anchor": "middle", class: "hz-oh-colname", text: "plan" }));
+        fig.append(svg("text", { x: L.planX + L.planW / 2, y: 34, "text-anchor": "middle", class: "hz-oh-colname", text: "room_type" }));
         planCells = [];
         planTexts = [];
         START.forEach((_, i) => {
@@ -109,8 +109,8 @@
         PLANS.forEach((p, j) => {
           const g = svg("g", { class: "hz-oh-col", opacity: 0 });
           const head = svg("g", { class: "hz-oh-head" }, [
-            svg("text", { x: colX(j) + L.colW / 2, y: 18, "text-anchor": "middle", class: "hz-oh-pre", text: "plan_" }),
-            svg("text", { x: colX(j) + L.colW / 2, y: 34, "text-anchor": "middle", text: L.narrow && p === "Unlimited" ? "Unlim." : p }),
+            svg("text", { x: colX(j) + L.colW / 2, y: 18, "text-anchor": "middle", class: "hz-oh-pre", text: L.narrow ? "" : "room_type_" }),
+            svg("text", { x: colX(j) + L.colW / 2, y: 34, "text-anchor": "middle", text: p }),
           ]);
           g.append(head);
           START.forEach((_, i) => {
@@ -122,6 +122,8 @@
           fig.append(g);
           cols.push(g);
         });
+        if (L.narrow) // one shared prefix: three copies would collide on a phone
+          fig.append(svg("g", { class: "hz-oh-head" }, [svg("text", { x: colX(0) + (PLANS.length * L.colW + (PLANS.length - 1) * L.colGap) / 2, y: 16, "text-anchor": "middle", class: "hz-oh-pre", text: "room_type_ …" })]));
         refLab = svg("text", { x: colX(0) + L.colW / 2, y: L.top + START.length * L.pitch + 12, "text-anchor": "middle", class: "hz-oh-reflab", opacity: 0, text: L.narrow ? "dropped" : "reference" });
         fig.append(refLab);
         token = svg("g", { class: "hz-oh-token", opacity: 0 }, [svg("circle", { r: 11 }), svg("text", { y: 4.5, "text-anchor": "middle", text: "1" })]);
@@ -144,7 +146,7 @@
       }
       function paintStatic() {
         planTexts.forEach((t, i) => (t.textContent = PLANS[plans[i]]));
-        planCells.forEach((g, i) => g.setAttribute("aria-label", `Row ${i}: ${PLANS[plans[i]]}. Activate to change the plan.`));
+        planCells.forEach((g, i) => g.setAttribute("aria-label", `Booking ${i}: ${PLANS[plans[i]]}. Activate to change the room type.`));
         cols.forEach((g, j) => {
           g.setAttribute("opacity", encoded ? (dropFirst && j === 0 ? 0.25 : 1) : 0);
           g.classList.toggle("is-ref", dropFirst && j === 0);
@@ -253,20 +255,20 @@
         if (last !== null && encoded) {
           const p = PLANS[plans[last]];
           if (dropFirst && plans[last] === 0)
-            return `Row ${last} is now <strong>Prepaid</strong>: every remaining column is 0. With ${c("drop_first=True")}, "all zeros" is how the table says Prepaid.`;
-          return `Row ${last} is now <strong>${p}</strong>: its 1 moved to ${c("plan_" + p)}. Exactly one column is on per row, so a plan coefficient applies only to that plan's customers.`;
+            return `Booking ${last} is now <strong>Standard</strong>: every remaining column is 0. With ${c("drop_first=True")}, "all zeros" is how the table says Standard.`;
+          return `Booking ${last} is now <strong>${p}</strong>: its 1 moved to ${c("room_type_" + p)}. Exactly one column is on per booking, so the ${p} coefficient applies only to ${p} bookings.`;
         }
-        if (!encoded) return "Each row is a customer. Press <strong>Encode</strong> to turn the text column into numbers.";
+        if (!encoded) return "Each row is a booking. Press <strong>Encode</strong> to turn the text column into numbers.";
         if (dropFirst)
-          return `With ${c("drop_first=True")} the first category, <strong>Prepaid</strong>, loses its column. A row of all zeros now means Prepaid: it becomes the <strong>reference</strong>, and every plan coefficient will read as "dollars more than Prepaid". (Alphabetically the first plan would be Basic; in class we set the order so Prepaid comes first.)`;
-        return "Every row has exactly one 1, so the four columns always add up to 1. That makes one of them redundant: if a customer is not Basic, Plus or Unlimited, we already know they are Prepaid. Try " + c("drop_first=True") + ".";
+          return `With ${c("drop_first=True")} the first category, <strong>Standard</strong>, loses its column. A row of all zeros now means Standard: it becomes the <strong>reference</strong>, and each room coefficient will read as "USD per night more than a Standard room". Standard happens to come first alphabetically; for other columns we choose the reference ourselves (Direct for channel, Santiago for hotel).`;
+        return "Every row has exactly one 1, so the three columns always add up to 1. That makes one of them redundant: if a booking is not a Suite or a Superior, we already know it is a Standard room. Try " + c("drop_first=True") + ".";
       }
 
       function syncUi() {
         encodeBtn.disabled = busy || encoded;
         dropSeg.set(String(dropFirst));
         const cols = dropFirst ? PLANS.slice(1) : PLANS;
-        code.innerHTML = `pd.get_dummies(df["plan"], drop_first=<b>${dropFirst ? "True" : "False"}</b>, dtype=int)\n# → ${encoded ? cols.map((p) => "plan_" + p).join(", ") : "press Encode"}`;
+        code.innerHTML = `pd.get_dummies(df["room_type"], drop_first=<b>${dropFirst ? "True" : "False"}</b>, dtype="int64")\n# → ${encoded ? cols.map((p) => "room_type_" + p).join(", ") : "press Encode"}`;
         note.innerHTML = caption();
       }
 

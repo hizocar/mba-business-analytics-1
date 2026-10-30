@@ -33,16 +33,16 @@ The data is dirty on purpose, as real data is. Finding and fixing its problems i
 
 ## How it moves forward
 
-The case advances with the sessions. The last part of each live session is a **case clinic** where teams take the same step with their own data.
+The case advances with the sessions. The last part of each live session is a **case clinic** where teams take the same step with their own data, running the matching sections of the [case toolkit](Case_Toolkit.ipynb).
 
-| Week | Step | What you should have |
-|:--:|---|---|
-| 1 | The question | Team formed, case chosen, the business question in two lines, and who would use the answer. |
-| 2 | Clean data and patterns | The data cleaned with the toolkit, a table of the problems you fixed, and three patterns with a chart each. |
-| 3 | A first model | A linear model (regression or logistic) evaluated on test data. |
-| 4 | The right metric | The metric that matters for your decision, and, for classification, a threshold justified with costs. |
-| 5 | A nonlinear model | A decision tree, its depth chosen with cross-validation. |
-| 6 | Comparison and recommendation | Random forest and gradient boosting compared with your earlier models; the drivers of the best model; three recommendations. |
+| Week | Step | Toolkit sections | What you should have |
+|:--:|---|---|---|
+| 1 | The question | 00–01 | Team formed, case chosen, the business question in two lines, and who would use the answer. |
+| 2 | Clean data and patterns | 02–04 | The data cleaned with the toolkit, a table of the problems you fixed, and three patterns with a chart each. |
+| 3 | A first model | 05–06 | A linear model (regression or logistic) evaluated on test data. |
+| 4 | The right metric | 07 | The metric that matters for your decision, and, for classification, a threshold justified with costs. |
+| 5 | A nonlinear model | 08 | A decision tree, its depth chosen with cross-validation. |
+| 6 | Comparison and recommendation | 09–12 | Random forest and gradient boosting compared with your earlier models; the drivers of the best model; three recommendations. |
 
 ## What you hand in
 

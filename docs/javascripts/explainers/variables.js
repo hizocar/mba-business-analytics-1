@@ -9,24 +9,24 @@
   const { el, svg } = HZ;
 
   const STEPS = [
-    { code: 'plan = "Plus"', name: "plan", value: "'Plus'", type: "str",
-      note: "Python builds the value <code>'Plus'</code> first, then sticks the label <code>plan</code> on it. Text in quotes is a <code>str</code> (string)." },
-    { code: "monthly_bill = 31.9", name: "monthly_bill", value: "31.9", type: "float",
-      note: "A number with a decimal point is a <code>float</code>. The label <code>monthly_bill</code> now points at 31.9." },
-    { code: "tenure_months = 14", name: "tenure_months", value: "14", type: "int",
+    { code: 'hotel = "Viña del Mar"', name: "hotel", value: "'Viña del Mar'", type: "str",
+      note: "Python builds the value <code>'Viña del Mar'</code> first, then sticks the label <code>hotel</code> on it. Text in quotes is a <code>str</code> (string): names, channels, countries." },
+    { code: "adr = 180.5", name: "adr", value: "180.5", type: "float",
+      note: "A number with a decimal point is a <code>float</code>. The label <code>adr</code> (average daily rate, USD per night) now points at 180.5." },
+    { code: "nights = 3", name: "nights", value: "3", type: "int",
       note: "A whole number is an <code>int</code>. Notice you never declare the type: Python reads it from the value." },
-    { code: "autopay = True", name: "autopay", value: "True", type: "bool",
-      note: "<code>True</code> and <code>False</code> (capital first letter, no quotes) are <code>bool</code> values: yes/no facts about a customer." },
-    { code: "tenure_months = tenure_months + 1", name: "tenure_months", reads: "tenure_months", expr: ["tenure_months + 1", "14 + 1"], value: "15", type: "int",
-      note: "Python computes the right side first: it reads what <code>tenure_months</code> points at (14), adds 1, builds 15, and only then moves the label. Nothing points at 14 any more, so Python throws it away." },
-    { code: "monthly_bill = monthly_bill * 1.05", name: "monthly_bill", reads: "monthly_bill", expr: ["monthly_bill * 1.05", "31.9 * 1.05"], value: "33.495", type: "float",
-      note: "Same pattern for the 5% price rise: compute <code>31.9 * 1.05</code>, get a new float, re-point <code>monthly_bill</code>. The old 31.9 is gone; if you need it, keep it under another name first." },
-    { code: 'plan = "Unlimited"', name: "plan", value: "'Unlimited'", type: "str",
-      note: "The customer upgrades. Reassigning just moves the label to a new value; <code>'Plus'</code> is discarded." },
-    { code: 'months = int("14")', name: "months", pre: { value: "'14'", type: "str" }, expr: ["int('14')"], value: "14", type: "int",
-      note: "<code>\"14\"</code> is text, the way numbers often arrive from a file. <code>int()</code> converts it to a whole number (also <code>float()</code> and <code>str()</code>). Without it, <code>\"14\" + 1</code> is a TypeError." },
+    { code: "canceled = False", name: "canceled", value: "False", type: "bool",
+      note: "<code>True</code> and <code>False</code> (capital first letter, no quotes) are <code>bool</code> values: yes/no facts about a booking." },
+    { code: "nights = nights + 1", name: "nights", reads: "nights", expr: ["nights + 1", "3 + 1"], value: "4", type: "int",
+      note: "The guest extends the stay. Python computes the right side first: it reads what <code>nights</code> points at (3), adds 1, builds 4, and only then moves the label. Nothing points at 3 any more, so Python throws it away." },
+    { code: "adr = adr - 20", name: "adr", reads: "adr", expr: ["adr - 20", "180.5 - 20"], value: "160.5", type: "float",
+      note: "Same pattern for a 20 USD promotion: compute <code>180.5 - 20</code>, get a new float, re-point <code>adr</code>. The old rate is gone; if you need it, keep it under another name first." },
+    { code: 'hotel = "Puerto Varas"', name: "hotel", value: "'Puerto Varas'", type: "str",
+      note: "The guest moves the booking to the lake. Reassigning just moves the label to a new value; <code>'Viña del Mar'</code> is discarded." },
+    { code: 'lead_time = int("45")', name: "lead_time", pre: { value: "'45'", type: "str" }, expr: ["int('45')"], value: "45", type: "int",
+      note: "<code>\"45\"</code> is text, the way numbers often arrive from a file or a web form. <code>int()</code> converts it to a whole number (also <code>float()</code> and <code>str()</code>). Without it, <code>\"45\" + 1</code> is a TypeError." },
   ];
-  const ORDER = ["plan", "monthly_bill", "tenure_months", "autopay", "months"];
+  const ORDER = ["hotel", "adr", "nights", "canceled", "lead_time"];
   const PYTYPE = { str: "str", float: "float", int: "int", bool: "bool" };
 
   // Geometry (SVG user units)
@@ -316,7 +316,7 @@
   }
 
   HZ.register("variables", {
-    kicker: "Session 1",
+    kicker: "Week 1",
     title: "Variables are labels on values",
     mount,
     css: `

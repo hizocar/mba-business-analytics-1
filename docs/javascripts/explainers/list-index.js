@@ -154,7 +154,7 @@
 
   HZ.register("list-index", {
     title: "Indexing and slicing a list",
-    kicker: "Session 1",
+    kicker: "Week 1",
     css: `
 @media (max-width: 30em) {
   .md-typeset .hz-x svg.hz-list-index-fig.is-compact .hz-list-index-name { font-size: 19px; }
